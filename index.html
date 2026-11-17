@@ -680,7 +680,8 @@ function renderExames() {
   const list = $("#examList"); const exams = Store.exams().slice().reverse();
   if (!exams.length) {
     list.replaceChildren(el("div", { class: "empty" }, "Nenhum exame arquivado. ",
-      "Envie um PDF ou uma foto de exame acima, ou use “Importar backup” se já tiver um arquivo do Health Royale."));
+      "Envie um PDF ou uma foto de exame acima, ou use “Importar backup” se já tiver um arquivo do Health Royale.",
+      Store.mode === "cloud" ? localDataBlock() : null));
     return;
   }
   list.replaceChildren(...exams.map(ex => {
@@ -931,7 +932,7 @@ function offerMigration() {
   const loc = localSnapshot(); const n = Object.keys(loc.docs).length;
   if (!n) return;
   let done = false; try { done = localStorage.getItem("hr-migrated-" + Cloud.uid) === "1"; } catch (e) {}
-  if (done) return;
+  if (done) { Banner.show(`Este navegador ainda tem ${n} exame(s) fora da sua conta. Para trazê-los, abra Configurações.`); setTimeout(() => Banner.clear(), 8000); return; }
   const b = $("#banner");
   b.replaceChildren(el("div", { class: "notice", style: "display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap" },
     el("span", { text: `Este navegador tem ${n} exame(s) salvos fora de qualquer conta. Se forem seus, traga-os para o seu perfil (eles saem deste navegador e passam a ficar só na sua conta).` }),
@@ -970,6 +971,13 @@ function scheduleCloudPublish() {
     cloudPubSig = sig; await Cloud.set(ref, { ...doc, date: new Date().toISOString().slice(0, 10) }).catch(e => Banner.show("Arena: " + Cloud.msg(e), "bad"));
   }, 1200);
 }
+function localDataBlock() {
+  const loc = localSnapshot(); const n = Object.keys(loc.docs).length; const nf2 = Object.keys(loc.files).length;
+  if (!n && !nf2) return null;
+  return el("div", { class: "notice", style: "display:flex;flex-direction:column;gap:8px" },
+    el("span", { text: `Este navegador tem ${n} exame(s)${nf2 ? ` e ${nf2} arquivo(s)` : ""} guardados fora da sua conta, de quando o site funcionava sem login. Traga-os para a conta para vê-los em qualquer computador.` }),
+    el("span", {}, el("button", { class: "btn sm primary", type: "button", onclick: () => { closeModal(); migrateLocal(loc); } }, "Trazer para minha conta")));
+}
 function openCloudSettings(reason) {
   const u = Cloud.user; const parts = [];
   parts.push(el("h2", { id: "mTitle", text: "Configurações" }));
@@ -977,6 +985,7 @@ function openCloudSettings(reason) {
   parts.push(el("div", { class: "who", style: "gap:10px" }, u?.photoURL ? el("img", { src: u.photoURL, alt: "", referrerpolicy: "no-referrer" }) : el("span", { class: "av", text: (u?.email || "?").slice(0, 1).toUpperCase() }),
     el("span", {}, el("strong", { style: "color:var(--ink)", text: u?.displayName || "" }), el("br"), u?.email || ""),
     el("button", { class: "btn sm", type: "button", style: "margin-left:auto", onclick: () => { closeModal(); Cloud.A.signOut(Cloud.auth); } }, "Sair")));
+  const ld = localDataBlock(); if (ld) parts.push(ld);
   if (!Cloud.isAdmin) {
     parts.push(el("p", { class: "small muted", text: AI.key() ? "A leitura dos exames usa a chave configurada pelo administrador." : "O administrador ainda não cadastrou a chave da API, então a leitura de exames está desligada. Importar backup continua funcionando." }));
     parts.push(el("div", { class: "acts" }, el("button", { class: "btn primary", type: "button", onclick: closeModal }, "Fechar")));
