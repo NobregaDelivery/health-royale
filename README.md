@@ -13,12 +13,14 @@ Arquive seus exames de sangue e de bioimpedância, veja o que melhorou e o que p
 - **Arquivos:** todos os arquivos enviados, os exames que saíram de cada um e uma cópia do original guardada no navegador. O calendário mostra os meses com exame, sem exame e com dados só de histórico, para você saber se falta enviar algum laudo.
 - **Arena:** cada marcador vira uma nota de 0 a 100 (de 10 em 10) pela distância da faixa de referência. Você gera um código de cartão com essas notas e troca com amigos; a arena mostra a classificação e quem está melhor em cada marcador.
 
-## Privacidade
+## Contas e privacidade
 
-- **Os exames e as cópias dos arquivos ficam só no seu navegador** (localStorage e IndexedDB). Nada é enviado para este repositório nem para outro servidor.
-- **A leitura dos arquivos** usa a sua própria chave da API da Anthropic, guardada só no seu navegador e enviada só para `api.anthropic.com`. Crie uma em [console.anthropic.com](https://console.anthropic.com/settings/keys); cada leitura consome créditos da sua conta.
-- **O código de cartão da arena** leva apenas as notas arredondadas por marcador, sem valores, datas ou arquivos. A nota ainda dá uma ideia aproximada de quão longe da referência a pessoa está.
-- **Backups:** use "Exportar backup" para levar seus dados para outro aparelho. **Nunca suba o arquivo de backup para este repositório** — o `.gitignore` já bloqueia `health-royale-backup*.json`.
+- **Login com Google:** só entram os e-mails aprovados pelo administrador (até 4 pessoas). Quem não está na lista vê uma tela de acesso negado.
+- **Cada pessoa tem o próprio perfil** no Firebase (Firestore, plano gratuito): exames, configurações e cópias dos arquivos. As regras de segurança (`firestore.rules`) garantem que ninguém lê os dados de outra pessoa, nem o administrador.
+- **Arena:** quem quiser participar publica só as notas de 0 a 100 por marcador, nunca os valores. Para comparar com alguém de fora, ainda dá para trocar o código de cartão.
+- **Leitura dos exames:** usa a chave da API da Anthropic cadastrada pelo administrador. Quem tem acesso consegue ver essa chave pelas ferramentas do navegador; por isso vale definir um limite de gastos no console da Anthropic.
+- **Backups:** "Exportar backup" baixa seus exames em JSON. **Nunca suba o arquivo de backup para este repositório** — o `.gitignore` já bloqueia `health-royale-backup*.json`.
+- A configuração do Firebase no `index.html` é pública por natureza; a proteção dos dados está nas regras do Firestore.
 
 ## Aviso
 
@@ -26,4 +28,4 @@ O Health Royale organiza e compara números; ele não faz diagnóstico. "Melhoro
 
 ## Estrutura
 
-Um único arquivo, `index.html`, sem build. Usa [pdf.js](https://mozilla.github.io/pdf.js/) (via cdnjs) para extrair o texto dos PDFs e a API Messages da Anthropic para interpretar os resultados.
+Um único arquivo, `index.html`, sem build. Usa [pdf.js](https://mozilla.github.io/pdf.js/) (via cdnjs) para extrair o texto dos PDFs, a API Messages da Anthropic para interpretar os resultados e o Firebase (Auth + Firestore) para login e perfis.

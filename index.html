@@ -802,7 +802,14 @@ function confirmDialog(title, text, okLabel) {
 
 /* ------------------------------------------------------------------ nuvem: login Google + Firestore */
 // Configuração do projeto Firebase (pública por natureza; a segurança fica nas regras do Firestore).
-const FIREBASE_CONFIG = null;
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCGXnJd3bnrFQSrQ3plz3iMeRfDnRcMulg",
+  authDomain: "health-royale.firebaseapp.com",
+  projectId: "health-royale",
+  storageBucket: "health-royale.firebasestorage.app",
+  messagingSenderId: "1095817732516",
+  appId: "1:1095817732516:web:2be1993402808d2dd76131"
+};
 const FB_VER = "10.12.2";
 const MAX_PEOPLE = 4;
 const CHUNK = 700000; // caracteres base64 por bloco (documento do Firestore tem limite de 1 MiB)
