@@ -217,6 +217,19 @@ td.na{color:var(--line)}
 .cov-leg{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin-top:10px}
 .cov-leg span{display:inline-flex;align-items:center;gap:6px}
 .cov-leg .c{width:16px;height:16px;border-radius:4px;border:1px solid var(--line);display:inline-block}
+/* login */
+body.gated nav.tabs, body.gated #btnAdd, body.gated #btnSettings, body.gated main > :not(#gate):not(#banner) { display:none !important; }
+#gate{display:none;min-height:60vh;align-items:center;justify-content:center}
+body.gated #gate{display:flex}
+.gate-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:32px 28px;max-width:420px;width:100%;display:flex;flex-direction:column;gap:14px;text-align:center;align-items:center}
+.gate-card svg.crown{width:48px;height:48px;color:var(--accent)}
+.gbtn{display:inline-flex;align-items:center;gap:10px;border:1px solid var(--line);background:var(--surface);padding:10px 18px;border-radius:999px;font-weight:600;cursor:pointer}
+.gbtn:hover{border-color:var(--muted)}
+.who{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+.who img,.who .av{width:28px;height:28px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-weight:700;font-size:12px;object-fit:cover}
+.field{display:flex;flex-direction:column;gap:6px}
+.field input,.field select{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 10px;background:var(--surface)}
+.field label{font-weight:600}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
 </style>
 </head>
@@ -235,6 +248,7 @@ td.na{color:var(--line)}
       <a href="#arquivos" data-v="arquivos">Arquivos</a>
       <a href="#arena" data-v="arena">Arena</a>
     </nav>
+    <div class="who" id="who"></div>
     <button class="btn" id="btnSettings" type="button" aria-label="Configurações">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" stroke="currentColor" stroke-width="2"/></svg>
       Configurações
@@ -251,6 +265,7 @@ td.na{color:var(--line)}
 
 <main class="wrap">
   <div id="banner"></div>
+  <section id="gate" aria-live="polite"><div class="gate-card" id="gateCard"></div></section>
 
   <!-- PAINEL -->
   <section class="view" id="v-painel" aria-labelledby="h-painel">
@@ -415,13 +430,13 @@ const Store = {
     catch (e) { Banner.show("Este navegador não permite guardar dados (modo privado?). Os exames somem ao fechar a página; use Exportar backup.", "warn"); }
   },
   persistLocal() { try { localStorage.setItem("health-royale", JSON.stringify({ docs: Object.fromEntries(this.docs), settings: this.settings })); } catch (e) { Banner.show("Não foi possível guardar neste navegador. Exporte um backup para não perder os dados.", "bad"); } },
-  async put(id, data) { this.docs.set(id, data); this.persistLocal(); this.emit(); },
-  async remove(id) { this.docs.delete(id); this.persistLocal(); this.emit(); },
-  async saveSettings(s) { this.settings = { ...this.settings, ...s }; this.persistLocal(); },
+  async put(id, data) { if (this.mode === "cloud") return Cloud.set(["users", Cloud.uid, "exams", id], data); this.docs.set(id, data); this.persistLocal(); this.emit(); },
+  async remove(id) { if (this.mode === "cloud") return Cloud.del(["users", Cloud.uid, "exams", id]); this.docs.delete(id); this.persistLocal(); this.emit(); },
+  async saveSettings(s) { this.settings = { ...this.settings, ...s }; if (this.mode === "cloud") return Cloud.set(["users", Cloud.uid], { settings: this.settings }, { mergeFields: ["settings"] }); this.persistLocal(); },
   files: new Map(),
   saveFiles() { try { localStorage.setItem("health-royale-files", JSON.stringify(Object.fromEntries(this.files))); } catch (e) { Banner.show("Não foi possível guardar a lista de arquivos neste navegador.", "bad"); } },
-  putFile(rec) { this.files.set(rec.id, rec); this.saveFiles(); },
-  removeFileRec(id) { this.files.delete(id); this.saveFiles(); },
+  putFile(rec) { this.files.set(rec.id, rec); if (this.mode === "cloud") return Cloud.set(["users", Cloud.uid, "files", rec.id], rec, { merge: true }).catch(e => Banner.show("Não foi possível salvar a lista de arquivos: " + Cloud.msg(e), "bad")); this.saveFiles(); },
+  removeFileRec(id) { this.files.delete(id); if (this.mode === "cloud") return Cloud.del(["users", Cloud.uid, "files", id]).catch(() => {}); this.saveFiles(); },
   exams() { return [...this.docs.values()].filter(e => e && isDate(e.date)).sort((a, b) => a.date.localeCompare(b.date)); }
 };
 
@@ -713,8 +728,8 @@ document.addEventListener("keydown", e => { if (e.key === "Escape" && $("#scrim"
 /* ------------------------------------------------------------------ AI (Claude API, chave do próprio usuário) */
 const MODELS = [["claude-sonnet-5-5", "Claude Sonnet 5.5 (recomendado)"], ["claude-opus-5-5", "Claude Opus 5.5 (mais preciso, mais caro)"], ["claude-haiku-5-5", "Claude Haiku 5.5 (mais rápido e barato)"]];
 const AI = {
-  key() { try { return localStorage.getItem("hr-api-key") || ""; } catch (e) { return ""; } },
-  model() { try { return localStorage.getItem("hr-model") || MODELS[0][0]; } catch (e) { return MODELS[0][0]; } },
+  key() { if (Store.mode === "cloud") return Cloud.appCfg.apiKey || ""; try { return localStorage.getItem("hr-api-key") || ""; } catch (e) { return ""; } },
+  model() { if (Store.mode === "cloud") return Cloud.appCfg.model || MODELS[0][0]; try { return localStorage.getItem("hr-model") || MODELS[0][0]; } catch (e) { return MODELS[0][0]; } },
   async ask(prompt, { images = [], pdf = null } = {}) {
     const content = [];
     for (const b of images) content.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: await blobToB64(b) } });
@@ -738,6 +753,7 @@ const AI = {
 function blobToB64(blob) { return new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(",")[1]); fr.onerror = () => rej(fr.error); fr.readAsDataURL(blob); }); }
 
 function openSettings(reason) {
+  if (Store.mode === "cloud") return openCloudSettings(reason);
   const keyIn = el("input", { type: "password", id: "setKey", autocomplete: "off", placeholder: "sk-ant-…", value: AI.key(), style: "width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 10px;background:var(--surface);font-family:var(--f-num)" });
   const modelSel = el("select", { id: "setModel", style: "width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 10px;background:var(--surface)" }, ...MODELS.map(([v, t]) => el("option", { value: v, text: t, selected: v === AI.model() || null })));
   const show = el("label", { class: "tg small muted", style: "display:inline-flex;gap:6px;align-items:center;cursor:pointer" }, el("input", { type: "checkbox", id: "setShow", onchange: e => { keyIn.type = e.target.checked ? "text" : "password"; } }), "Mostrar chave");
@@ -764,9 +780,10 @@ const Vault = {
     return this._db;
   },
   async tx(mode, fn) { const db = await this.open(); return new Promise((res, rej) => { const t = db.transaction("blobs", mode); const out = fn(t.objectStore("blobs")); t.oncomplete = () => res(out?.result); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); }); },
-  put(id, blob) { return this.tx("readwrite", st => st.put(blob, id)); },
-  get(id) { return this.tx("readonly", st => st.get(id)); },
-  del(id) { return this.tx("readwrite", st => st.delete(id)); }
+  put(id, blob) { if (Store.mode === "cloud") return Cloud.putBlob(id, blob); return this.tx("readwrite", st => st.put(blob, id)); },
+  get(id) { if (Store.mode === "cloud") return Cloud.getBlob(id); return this.tx("readonly", st => st.get(id)); },
+  del(id) { if (Store.mode === "cloud") return Cloud.delBlob(id); return this.tx("readwrite", st => st.delete(id)); },
+  localGet(id) { return this.tx("readonly", st => st.get(id)); }
 };
 async function hashFile(file) {
   try { const buf = await crypto.subtle.digest("SHA-256", await file.arrayBuffer()); return "f" + [...new Uint8Array(buf)].slice(0, 10).map(b => b.toString(16).padStart(2, "0")).join(""); }
@@ -781,6 +798,216 @@ function confirmDialog(title, text, okLabel) {
     openModal(el("div", { class: "modal narrow" }, el("h2", { id: "mTitle", text: title }), el("p", { class: "muted", text }),
       el("div", { class: "acts" }, el("button", { class: "btn", type: "button", onclick: () => done(false) }, "Cancelar"), el("button", { class: "btn primary", type: "button", onclick: () => done(true) }, okLabel))));
   });
+}
+
+/* ------------------------------------------------------------------ nuvem: login Google + Firestore */
+// Configuração do projeto Firebase (pública por natureza; a segurança fica nas regras do Firestore).
+const FIREBASE_CONFIG = null;
+const FB_VER = "10.12.2";
+const MAX_PEOPLE = 4;
+const CHUNK = 700000; // caracteres base64 por bloco (documento do Firestore tem limite de 1 MiB)
+const Cloud = {
+  on: false, A: null, F: null, auth: null, db: null, user: null, uid: null, email: "", isAdmin: false,
+  access: { admin: "", emails: [] }, appCfg: {}, arena: [], unsubs: [], migrated: false,
+  ref(path) { return path.length % 2 ? this.F.collection(this.db, ...path) : this.F.doc(this.db, ...path); },
+  set(path, data, opt) { return opt ? this.F.setDoc(this.ref(path), clean(data), opt) : this.F.setDoc(this.ref(path), clean(data)); },
+  del(path) { return this.F.deleteDoc(this.ref(path)); },
+  msg(e) { const c = e?.code || ""; if (c.includes("permission")) return "sem permissão"; if (c.includes("unavailable")) return "sem conexão"; if (c.includes("resource-exhausted")) return "limite gratuito do dia atingido"; return e?.message || c || String(e); },
+  async putBlob(id, blob) {
+    if (blob.size > 10 * 1024 * 1024) throw new Error("arquivo maior que 10 MB");
+    const b64 = await blobToB64(blob); const n = Math.max(1, Math.ceil(b64.length / CHUNK));
+    await this.delBlob(id).catch(() => {});
+    for (let i = 0; i < n; i++) await this.set(["users", this.uid, "files", id, "chunks", String(i).padStart(4, "0")], { d: b64.slice(i * CHUNK, (i + 1) * CHUNK) });
+    await this.set(["users", this.uid, "files", id], { chunks: n, mime: blob.type || "", hasBlob: true }, { merge: true });
+  },
+  async getBlob(id) {
+    const snap = await this.F.getDocs(this.ref(["users", this.uid, "files", id, "chunks"]));
+    if (snap.empty) return null;
+    const b64 = snap.docs.map(d => d.data().d || "").join("");
+    const bin = atob(b64); const bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const meta = Store.files.get(id) || {};
+    return new Blob([bytes], { type: meta.mime || meta.type || "application/octet-stream" });
+  },
+  async delBlob(id) { const snap = await this.F.getDocs(this.ref(["users", this.uid, "files", id, "chunks"])); for (const d of snap.docs) await this.F.deleteDoc(d.ref); }
+};
+// Firestore não aceita undefined
+function clean(o) { return JSON.parse(JSON.stringify(o, (k, v) => v === undefined ? null : v)); }
+
+async function cloudBoot() {
+  if (!FIREBASE_CONFIG) return false;
+  const base = `https://www.gstatic.com/firebasejs/${FB_VER}/`;
+  const [appM, A, F] = await Promise.all([import(base + "firebase-app.js"), import(base + "firebase-auth.js"), import(base + "firebase-firestore.js")]);
+  const app = appM.initializeApp(FIREBASE_CONFIG);
+  Object.assign(Cloud, { on: true, A, F, auth: A.getAuth(app), db: F.getFirestore(app) });
+  return true;
+}
+const G_LOGO = '<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>';
+const CROWN = '<svg class="crown" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M5 23 3.5 10l7 5L16 6l5.5 9 7-5L27 23Z" fill="currentColor" opacity=".18"/><path d="M5 23 3.5 10l7 5L16 6l5.5 9 7-5L27 23Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M6 27h20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+function showGate(state, extra) {
+  document.body.classList.add("gated");
+  const c = $("#gateCard"); c.replaceChildren();
+  c.insertAdjacentHTML("beforeend", CROWN);
+  c.append(el("h1", { text: "Health Royale" }));
+  if (state === "loading") c.append(el("p", { class: "muted", text: "Carregando…" }));
+  if (state === "login") {
+    c.append(el("p", { class: "muted", text: "Entre com sua conta Google para ver seus exames. O acesso é só para pessoas convidadas." }));
+    const b = el("button", { class: "gbtn", type: "button", id: "btnLogin", onclick: login }); b.insertAdjacentHTML("beforeend", G_LOGO); b.append("Entrar com Google"); c.append(b);
+    if (extra) c.append(el("div", { class: "notice bad", text: extra }));
+  }
+  if (state === "denied") {
+    c.append(el("p", { text: `A conta ${extra || ""} ainda não tem acesso.` }), el("p", { class: "muted small", text: "Peça ao administrador do Health Royale para adicionar este e-mail em Configurações → Pessoas com acesso." }),
+      el("button", { class: "btn", type: "button", onclick: () => Cloud.A.signOut(Cloud.auth) }, "Usar outra conta"));
+  }
+}
+function hideGate() { document.body.classList.remove("gated"); }
+async function login() {
+  const prov = new Cloud.A.GoogleAuthProvider(); prov.setCustomParameters({ prompt: "select_account" });
+  try { await Cloud.A.signInWithPopup(Cloud.auth, prov); }
+  catch (e) {
+    if (/popup-blocked|operation-not-supported/.test(e?.code || "")) return Cloud.A.signInWithRedirect(Cloud.auth, prov);
+    if (/popup-closed|cancelled-popup/.test(e?.code || "")) return;
+    showGate("login", e?.code === "auth/unauthorized-domain" ? "Este endereço ainda não foi autorizado no Firebase (Authentication → Configurações → Domínios autorizados)." : "Não foi possível entrar: " + Cloud.msg(e));
+  }
+}
+function renderWho() {
+  const w = $("#who"); w.replaceChildren(); const u = Cloud.user; if (!u || Store.mode !== "cloud") return;
+  const first = (u.displayName || u.email || "").split(" ")[0];
+  if (u.photoURL) w.append(el("img", { src: u.photoURL, alt: "", referrerpolicy: "no-referrer" })); else w.append(el("span", { class: "av", text: first.slice(0, 1).toUpperCase() }));
+  w.append(el("span", { text: first + (Cloud.isAdmin ? " · admin" : "") }));
+}
+async function onAuth(u) {
+  Cloud.unsubs.forEach(f => { try { f(); } catch (e) {} }); Cloud.unsubs = [];
+  Store.docs = new Map(); Store.files = new Map(); Store.settings = {}; Cloud.arena = []; Cloud.appCfg = {}; Cloud.isAdmin = false;
+  Cloud.user = u; renderWho();
+  if (!u) { Store.mode = "cloud-out"; renderAll(); showGate("login"); return; }
+  Cloud.uid = u.uid; Cloud.email = (u.email || "").toLowerCase();
+  showGate("loading");
+  const F = Cloud.F;
+  // 1) acesso: lê a lista; se não existe e a pessoa é o admin das regras, cria
+  let acc;
+  try { acc = await F.getDoc(Cloud.ref(["config", "access"])); }
+  catch (e) { showGate("denied", u.email); return; }
+  if (!acc.exists()) {
+    try { await Cloud.set(["config", "access"], { admin: Cloud.email, emails: [Cloud.email] }); acc = await F.getDoc(Cloud.ref(["config", "access"])); }
+    catch (e) { showGate("denied", u.email); return; }
+  }
+  Cloud.access = acc.data() || { emails: [] }; Cloud.isAdmin = Cloud.access.admin === Cloud.email; renderWho();
+  // 2) perfil
+  try {
+    const me = await F.getDoc(Cloud.ref(["users", Cloud.uid]));
+    const prof = { email: Cloud.email, name: u.displayName || "", photo: u.photoURL || "", lastLogin: new Date().toISOString() };
+    if (!me.exists()) await Cloud.set(["users", Cloud.uid], { ...prof, createdAt: new Date().toISOString(), settings: {} });
+    else await Cloud.set(["users", Cloud.uid], prof, { merge: true });
+  } catch (e) { showGate("login", "Não foi possível abrir seu perfil: " + Cloud.msg(e)); return; }
+  Store.mode = "cloud"; renderWho();
+  // 3) escutas em tempo real
+  let first = true;
+  const onErr = e => Banner.show("Problema ao sincronizar: " + Cloud.msg(e), "bad");
+  Cloud.unsubs.push(F.onSnapshot(Cloud.ref(["config", "app"]), d => { Cloud.appCfg = d.exists() ? d.data() : {}; }, () => {}));
+  Cloud.unsubs.push(F.onSnapshot(Cloud.ref(["config", "access"]), d => { if (d.exists()) Cloud.access = d.data(); }, () => {}));
+  Cloud.unsubs.push(F.onSnapshot(Cloud.ref(["users", Cloud.uid]), d => { Store.settings = (d.exists() && d.data().settings) || {}; renderArena(); }, onErr));
+  Cloud.unsubs.push(F.onSnapshot(Cloud.ref(["users", Cloud.uid, "files"]), snap => { Store.files = new Map(snap.docs.map(d => [d.id, d.data()])); renderArquivos(); }, onErr));
+  Cloud.unsubs.push(F.onSnapshot(Cloud.ref(["arena"]), snap => { Cloud.arena = snap.docs.map(d => ({ uid: d.id, ...d.data() })); renderArena(); }, () => {}));
+  Cloud.unsubs.push(F.onSnapshot(Cloud.ref(["users", Cloud.uid, "exams"]), snap => {
+    Store.docs = new Map(snap.docs.map(d => [d.id, d.data()]));
+    Store.emit();
+    if (first) { first = false; hideGate(); offerMigration(); }
+  }, e => { onErr(e); hideGate(); }));
+}
+// Traz exames, configurações e cópias de arquivos guardados neste navegador para a conta (uma vez)
+function localSnapshot() {
+  try { const o = JSON.parse(localStorage.getItem("health-royale") || "{}"); const f = JSON.parse(localStorage.getItem("health-royale-files") || "{}"); return { docs: o.docs || {}, settings: o.settings || {}, files: f }; }
+  catch (e) { return { docs: {}, settings: {}, files: {} }; }
+}
+function offerMigration() {
+  if (Cloud.migrated) return;
+  const loc = localSnapshot(); const n = Object.keys(loc.docs).length;
+  if (!n) return;
+  let done = false; try { done = localStorage.getItem("hr-migrated-" + Cloud.uid) === "1"; } catch (e) {}
+  if (done) return;
+  const b = $("#banner");
+  b.replaceChildren(el("div", { class: "notice", style: "display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap" },
+    el("span", { text: `Este navegador tem ${n} exame(s) salvos fora de qualquer conta. Se forem seus, traga-os para o seu perfil (eles saem deste navegador e passam a ficar só na sua conta).` }),
+    el("span", { style: "display:flex;gap:8px" },
+      el("button", { class: "btn sm", type: "button", onclick: () => { try { localStorage.setItem("hr-migrated-" + Cloud.uid, "1"); } catch (e) {} Banner.clear(); } }, "Agora não"),
+      el("button", { class: "btn sm primary", type: "button", id: "btnMigrate", onclick: () => migrateLocal(loc) }, "Trazer para minha conta"))));
+  b.style.marginBottom = "16px";
+}
+async function migrateLocal(loc) {
+  Cloud.migrated = true; Banner.show("Copiando seus exames para a conta…");
+  try {
+    for (const ex of Object.values(loc.docs)) if (ex && isDate(ex.date)) await mergeExam({ ...ex, results: ex.results || [] }, !Store.docs.has(ex.id));
+    const { nick, friends } = loc.settings; if (nick || friends) await Store.saveSettings({ ...(nick ? { nick } : {}), ...(friends ? { friends } : {}) });
+    let copied = 0;
+    for (const rec of Object.values(loc.files)) {
+      if (!rec?.id) continue; let hasBlob = false;
+      try { const blob = await Vault.localGet(rec.id); if (blob) { await Cloud.putBlob(rec.id, blob); hasBlob = true; copied++; } } catch (e) {}
+      await Store.putFile({ ...rec, hasBlob: hasBlob || !!Store.files.get(rec.id)?.hasBlob });
+    }
+    try { localStorage.setItem("hr-migrated-" + Cloud.uid, "1"); localStorage.removeItem("health-royale"); localStorage.removeItem("health-royale-files"); } catch (e) {}
+    try { await Vault.tx("readwrite", st => st.clear()); } catch (e) {}
+    Banner.show(`Pronto: ${Object.keys(loc.docs).length} exame(s) e ${copied} arquivo(s) agora estão na sua conta.`); setTimeout(() => Banner.clear(), 6000);
+  } catch (e) { Cloud.migrated = false; Banner.show("A cópia parou no meio: " + Cloud.msg(e) + ". Tente de novo.", "bad"); }
+}
+// Arena da turma: publica só as notas
+let cloudPubTimer = null, cloudPubSig = "";
+function scheduleCloudPublish() {
+  if (Store.mode !== "cloud") return; clearTimeout(cloudPubTimer);
+  cloudPubTimer = setTimeout(async () => {
+    const ref = ["arena", Cloud.uid];
+    if (!Store.settings.arena) { if (Cloud.arena.some(a => a.uid === Cloud.uid)) await Cloud.del(ref).catch(() => {}); cloudPubSig = ""; return; }
+    const m = myScores(); const first = (Cloud.user?.displayName || Cloud.email).split(" ")[0];
+    const doc = { name: (Store.settings.nick || first).slice(0, 30), overall: m.overall, count: m.count, sc: Object.fromEntries(Object.entries(m.scores).map(([k, o]) => [k, o.s])) };
+    const sig = JSON.stringify(doc); const cur = Cloud.arena.find(a => a.uid === Cloud.uid);
+    if (sig === cloudPubSig || (cur && JSON.stringify({ name: cur.name, overall: cur.overall, count: cur.count, sc: cur.sc }) === sig)) return;
+    cloudPubSig = sig; await Cloud.set(ref, { ...doc, date: new Date().toISOString().slice(0, 10) }).catch(e => Banner.show("Arena: " + Cloud.msg(e), "bad"));
+  }, 1200);
+}
+function openCloudSettings(reason) {
+  const u = Cloud.user; const parts = [];
+  parts.push(el("h2", { id: "mTitle", text: "Configurações" }));
+  if (reason) parts.push(el("div", { class: "notice warn", text: reason }));
+  parts.push(el("div", { class: "who", style: "gap:10px" }, u?.photoURL ? el("img", { src: u.photoURL, alt: "", referrerpolicy: "no-referrer" }) : el("span", { class: "av", text: (u?.email || "?").slice(0, 1).toUpperCase() }),
+    el("span", {}, el("strong", { style: "color:var(--ink)", text: u?.displayName || "" }), el("br"), u?.email || ""),
+    el("button", { class: "btn sm", type: "button", style: "margin-left:auto", onclick: () => { closeModal(); Cloud.A.signOut(Cloud.auth); } }, "Sair")));
+  if (!Cloud.isAdmin) {
+    parts.push(el("p", { class: "small muted", text: AI.key() ? "A leitura dos exames usa a chave configurada pelo administrador." : "O administrador ainda não cadastrou a chave da API, então a leitura de exames está desligada. Importar backup continua funcionando." }));
+    parts.push(el("div", { class: "acts" }, el("button", { class: "btn primary", type: "button", onclick: closeModal }, "Fechar")));
+    openModal(el("div", { class: "modal narrow" }, ...parts)); return;
+  }
+  const others = (Cloud.access.emails || []).filter(e => e !== Cloud.email);
+  const inputs = Array.from({ length: MAX_PEOPLE - 1 }, (_, i) => el("input", { type: "email", id: "acc" + i, value: others[i] || "", placeholder: "email@gmail.com", autocomplete: "off", "aria-label": `E-mail ${i + 2}` }));
+  const keyIn = el("input", { type: "password", id: "setKey", autocomplete: "off", placeholder: "sk-ant-…", value: Cloud.appCfg.apiKey || "", style: "font-family:var(--f-num)" });
+  const modelSel = el("select", { id: "setModel" }, ...MODELS.map(([v, t]) => el("option", { value: v, text: t, selected: v === AI.model() || null })));
+  const err = el("div");
+  parts.push(el("div", { class: "field" }, el("label", { text: `Pessoas com acesso (até ${MAX_PEOPLE})` }),
+    el("input", { type: "email", value: Cloud.email, disabled: true, "aria-label": "Seu e-mail (administrador)" }), ...inputs,
+    el("p", { class: "small muted", style: "margin:0", text: "Cada pessoa entra com a conta Google desse e-mail e tem um perfil próprio. Ninguém vê os exames de ninguém; na arena aparecem só as notas de quem quiser participar." })));
+  parts.push(el("div", { class: "field" }, el("label", { for: "setKey", text: "Chave da API do Claude (usada por todos)" }), keyIn,
+    el("p", { class: "small muted", style: "margin:0" }, "As leituras de todas as pessoas são cobradas na sua conta da API. Quem tem acesso consegue ver a chave pelas ferramentas do navegador; defina um limite de gastos em ",
+      el("a", { href: "https://console.anthropic.com/settings/limits", target: "_blank", rel: "noopener", text: "console.anthropic.com" }), ".")));
+  parts.push(el("div", { class: "field" }, el("label", { for: "setModel", text: "Modelo" }), modelSel));
+  parts.push(err);
+  parts.push(el("div", { class: "acts" }, el("button", { class: "btn", type: "button", onclick: closeModal }, "Cancelar"),
+    el("button", { class: "btn primary", type: "button", id: "btnSaveCfg", onclick: async e => {
+      const list = inputs.map(i => i.value.trim().toLowerCase()).filter(Boolean);
+      const bad = list.find(x => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x));
+      if (bad) { err.replaceChildren(el("div", { class: "notice bad", text: `“${bad}” não parece um e-mail.` })); return; }
+      e.target.disabled = true;
+      try {
+        await Cloud.set(["config", "access"], { admin: Cloud.email, emails: [...new Set([Cloud.email, ...list])].slice(0, MAX_PEOPLE) });
+        await Cloud.set(["config", "app"], { apiKey: keyIn.value.trim(), model: modelSel.value });
+        closeModal(); Banner.show("Configurações salvas."); setTimeout(() => Banner.clear(), 3000);
+      } catch (x) { e.target.disabled = false; err.replaceChildren(el("div", { class: "notice bad", text: "Não foi possível salvar: " + Cloud.msg(x) })); }
+    } }, "Salvar")));
+  openModal(el("div", { class: "modal narrow" }, ...parts));
+}
+async function boot() {
+  let cloud = false;
+  try { cloud = await cloudBoot(); } catch (e) { Banner.show("Não foi possível carregar o login (" + (e.message || e) + "). Usando só este navegador.", "warn"); }
+  if (!cloud) { await Store.init(); renderAll(); return; }
+  showGate("loading");
+  Cloud.A.onAuthStateChanged(Cloud.auth, u => { onAuth(u).catch(e => showGate("login", "Erro ao entrar: " + Cloud.msg(e))); });
 }
 
 /* ------------------------------------------------------------------ file reading */
@@ -878,7 +1105,7 @@ const examId = (date, type) => `exam_${date}_${type === "Bioimpedância" ? "bio"
 let PENDING = null; // { fileNames, exams:[...] } awaiting review
 async function handleFiles(files) {
   files = [...files]; if (!files.length) return;
-  if (!AI.key()) { openSettings("Para ler exames, cole sua chave da API do Claude. Sem ela você ainda pode importar um backup."); return; }
+  if (!AI.key()) { openSettings(Store.mode === "cloud" && !Cloud.isAdmin ? "A leitura de exames ainda não foi configurada. Peça ao administrador para cadastrar a chave da API." : "Para ler exames, cole sua chave da API do Claude. Sem ela você ainda pode importar um backup."); return; }
   const st = $("#parseStatus");
   location.hash = "exames";
   const barI = el("i"); const msg = el("div", { class: "small", text: "Preparando…" });
@@ -1055,13 +1282,21 @@ function readCardCode(code) {
 const markerName = k => catalogByKey[k]?.name || SERIES.find(s => s.key === k)?.name || k.replace(/_/g, " ").replace(/^./, c => c.toUpperCase());
 function renderArena() {
   const body = $("#arenaBody"); body.replaceChildren();
-  const mine = myScores(); const friends = Store.settings.friends || [];
+  const mine = myScores();
+  const cloudPeople = Store.mode === "cloud" && Store.settings.arena ? Cloud.arena.filter(a => a.uid !== Cloud.uid && a.sc && typeof a.sc === "object").map(a => ({ id: "c_" + a.uid, nick: a.name || "Participante", overall: a.overall || 0, count: a.count || 0, sc: a.sc, date: a.date || null, cloud: true })) : [];
+  const friends = [...cloudPeople, ...(Store.settings.friends || [])];
   const nickIn = el("input", { type: "text", id: "nick", maxlength: "30", value: Store.settings.nick || "", placeholder: "Seu apelido na arena", style: "border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--surface);min-width:200px",
     onchange: async e => { await Store.saveSettings({ nick: e.target.value.trim() }); renderArena(); } });
   const code = mine.count ? myCardCode() : "";
   const codeBox = el("textarea", { readonly: true, id: "myCode", rows: "3", "aria-label": "Seu código de cartão", style: "width:100%;font-family:var(--f-num);font-size:12px;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--bg);color:var(--ink);resize:vertical" }); codeBox.value = code;
+  if (Store.mode === "cloud") {
+    const on = !!Store.settings.arena;
+    body.append(el("div", { class: "card" }, el("div", { class: "head" },
+      el("div", {}, el("h2", { text: "Arena da turma" }), el("p", { class: "small", text: on ? `Você está na arena com ${mine.count} marcadores. Suas notas se atualizam sozinhas a cada exame.` : "Entre para disputar com as outras pessoas que têm acesso. Só as notas são compartilhadas, nunca os valores." })),
+      el("label", { class: "switch", for: "arenaSw" }, el("input", { type: "checkbox", id: "arenaSw", checked: on || null, onchange: async e => { await Store.saveSettings({ arena: e.target.checked }); scheduleCloudPublish(); renderArena(); } }), on ? "Participando" : "Entrar na arena"))));
+  }
   body.append(el("div", { class: "card" },
-    el("h2", { text: "Seu cartão" }),
+    el("h2", { text: Store.mode === "cloud" ? "Cartão para quem não tem acesso" : "Seu cartão" }),
     el("p", { class: "small", style: "margin:-4px 0 10px", text: mine.count ? `Seu cartão leva as notas dos seus ${mine.count} marcadores com referência (nota geral ${mine.overall}). Valores, datas e arquivos não entram no código.` : "Arquive pelo menos um exame para gerar seu cartão." }),
     el("div", { class: "toolbar", style: "margin-bottom:10px" }, el("label", { for: "nick", class: "small muted", text: "Apelido" }), nickIn),
     code ? codeBox : null,
@@ -1085,10 +1320,10 @@ function renderArena() {
     el("p", { class: "muted small", style: "margin:-6px 0 8px", text: "Nota geral = média das notas dos marcadores de cada pessoa." }),
     el("div", { class: "rank" }, ...rows.map((r, i) => el("div", { class: "rk" + (r.id === "me" ? " me" : "") },
       el("div", { class: "pos", text: String(i + 1) }),
-      el("div", {}, el("div", { class: "nm", text: r.nick }), el("div", { class: "muted small", text: `${r.count} marcadores` + (r.date ? ` · cartão de ${fmtDate(r.date)}` : "") })),
+      el("div", {}, el("div", { class: "nm", text: r.nick }), el("div", { class: "muted small", text: `${r.count} marcadores` + (r.date ? ` · ${r.cloud ? "atualizado em" : "cartão de"} ${fmtDate(r.date)}` : "") })),
       el("div", { class: "meter", "aria-hidden": "true" }, el("i", { style: `width:${Math.max(0, Math.min(100, r.overall))}%` })),
       el("div", { style: "display:flex;gap:10px;align-items:center" }, el("span", { class: "num", style: "font-weight:600;min-width:3ch;text-align:right", text: String(r.overall) }),
-        r.id !== "me" ? el("button", { class: "btn sm", type: "button", "aria-label": "Remover " + r.nick, onclick: async () => { await Store.saveSettings({ friends: (Store.settings.friends || []).filter(f => f.id !== r.id) }); renderArena(); } }, "Remover") : null))))));
+        r.id !== "me" && !r.cloud ? el("button", { class: "btn sm", type: "button", "aria-label": "Remover " + r.nick, onclick: async () => { await Store.saveSettings({ friends: (Store.settings.friends || []).filter(f => f.id !== r.id) }); renderArena(); } }, "Remover") : null))))));
   if (!friends.length || !mine.count) { body.append(el("div", { class: "notice", text: friends.length ? "Arquive um exame para ver o confronto direto." : "Quando você adicionar o código de um amigo, a classificação e o confronto direto aparecem aqui." })); return; }
   if (!Arena.vs || !friends.some(f => f.id === Arena.vs)) Arena.vs = friends[0].id;
   const opp = friends.find(f => f.id === Arena.vs);
@@ -1314,8 +1549,8 @@ function renderAll() { SERIES = buildSeries(Store.exams()); renderPainel(); rend
 function afterDataChange() {}
 
 window.addEventListener("hashchange", route);
-$("#btnAdd").addEventListener("click", () => AI.key() ? $("#fileIn").click() : openSettings("Para ler exames, cole sua chave da API do Claude. Sem ela você ainda pode importar um backup."));
-$("#btnPick").addEventListener("click", () => AI.key() ? $("#fileIn").click() : openSettings("Para ler exames, cole sua chave da API do Claude. Sem ela você ainda pode importar um backup."));
+$("#btnAdd").addEventListener("click", () => AI.key() ? $("#fileIn").click() : openSettings(Store.mode === "cloud" && !Cloud.isAdmin ? "A leitura de exames ainda não foi configurada. Peça ao administrador para cadastrar a chave da API." : "Para ler exames, cole sua chave da API do Claude. Sem ela você ainda pode importar um backup."));
+$("#btnPick").addEventListener("click", () => AI.key() ? $("#fileIn").click() : openSettings(Store.mode === "cloud" && !Cloud.isAdmin ? "A leitura de exames ainda não foi configurada. Peça ao administrador para cadastrar a chave da API." : "Para ler exames, cole sua chave da API do Claude. Sem ela você ainda pode importar um backup."));
 $("#fileIn").addEventListener("change", e => { handleFiles(e.target.files); e.target.value = ""; });
 $("#btnImport").addEventListener("click", () => $("#jsonIn").click());
 $("#jsonIn").addEventListener("change", e => { if (e.target.files[0]) importBackup(e.target.files[0]); e.target.value = ""; });
@@ -1329,8 +1564,8 @@ const drop = $("#drop");
 drop.addEventListener("drop", e => handleFiles(e.dataTransfer.files));
 
 route(); renderAll();
-Store.onChange(renderAll);
-Store.init().then(renderAll);
+Store.onChange(() => { renderAll(); scheduleCloudPublish(); });
+boot();
 $("#btnSettings").addEventListener("click", () => openSettings());
 </script>
 </body>

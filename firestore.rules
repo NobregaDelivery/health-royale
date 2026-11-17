@@ -1,0 +1,41 @@
+rules_version = '2';
+// Regras do Health Royale. Troque SEU_EMAIL@gmail.com pelo e-mail do administrador (em minúsculas)
+// e cole em Firebase → Firestore Database → Regras → Publicar.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null && request.auth.token.email_verified == true; }
+    function email() { return request.auth.token.email.lower(); }
+    function isAdmin() { return signedIn() && email() == 'SEU_EMAIL@gmail.com'; }
+    function isAllowed() {
+      return isAdmin() || (signedIn()
+        && exists(/databases/$(database)/documents/config/access)
+        && email() in get(/databases/$(database)/documents/config/access).data.emails);
+    }
+    // Lista de quem tem acesso (até 4 e-mails, o do administrador incluído)
+    match /config/access {
+      allow read: if isAllowed();
+      allow write: if isAdmin()
+        && request.resource.data.admin == email()
+        && request.resource.data.emails is list
+        && request.resource.data.emails.size() <= 4
+        && email() in request.resource.data.emails;
+    }
+    // Chave da API e modelo, definidos pelo administrador
+    match /config/app {
+      allow read: if isAllowed();
+      allow write: if isAdmin();
+    }
+    // Exames, configurações e arquivos: só o dono lê e escreve
+    match /users/{uid}/{document=**} {
+      allow read, write: if isAllowed() && request.auth.uid == uid;
+    }
+    match /users/{uid} {
+      allow read, write: if isAllowed() && request.auth.uid == uid;
+    }
+    // Arena: todos com acesso leem as notas; cada um escreve só a própria
+    match /arena/{uid} {
+      allow read: if isAllowed();
+      allow write: if isAllowed() && request.auth.uid == uid;
+    }
+  }
+}
