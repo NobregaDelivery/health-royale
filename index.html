@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Health Royale: arquive seus exames, acompanhe o que melhorou e piorou e compare com amigos sem mostrar valores.">
+<meta name="robots" content="noindex">
+<title>Health Royale</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: top bar with tabs; one working column (max 1200px); summary first, detail below; table scrolls sideways in its own box. */
+:root{
+  --bg:#F3F4F7; --surface:#FFFFFF; --ink:#15171C; --muted:#5B6170; --line:#E1E3E9;
+  --accent:#2747D0; --accent-soft:#E7EBFC; --accent-ink:#FFFFFF;
+  --good:#16794B; --good-soft:#E3F4EB; --bad:#B8361F; --bad-soft:#FBE9E5; --warn:#94620A; --warn-soft:#FBF1DC;
+  --band:rgba(22,121,75,.10);
+  --f-display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body:"IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-num:"IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --r:10px; color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E1014; --surface:#171A21; --ink:#ECEEF3; --muted:#9BA2B0; --line:#2A2E37;
+    --accent:#8197FF; --accent-soft:#1E2442; --accent-ink:#0E1014;
+    --good:#45C486; --good-soft:#123024; --bad:#FF7F63; --bad-soft:#3A1C16; --warn:#E3AE45; --warn-soft:#352A12;
+    --band:rgba(69,196,134,.12); color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E1014; --surface:#171A21; --ink:#ECEEF3; --muted:#9BA2B0; --line:#2A2E37;
+  --accent:#8197FF; --accent-soft:#1E2442; --accent-ink:#0E1014;
+  --good:#45C486; --good-soft:#123024; --bad:#FF7F63; --bad-soft:#3A1C16; --warn:#E3AE45; --warn-soft:#352A12;
+  --band:rgba(69,196,134,.12); color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--f-body);-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:var(--f-display);font-weight:700;letter-spacing:-.01em;text-wrap:balance;margin:0}
+h1{font-size:26px} h2{font-size:19px} h3{font-size:15px}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.wrap{max-width:1200px;margin:0 auto;padding:0 20px}
+
+/* top bar */
+.top{background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+.top .wrap{display:flex;align-items:center;gap:20px;min-height:60px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--f-display);font-weight:700;font-size:19px;white-space:nowrap}
+.brand svg{width:26px;height:26px;color:var(--accent)}
+nav.tabs{display:flex;gap:4px;flex:1;flex-wrap:wrap}
+nav.tabs a{padding:8px 12px;border-radius:8px;color:var(--muted);text-decoration:none;font-weight:500}
+nav.tabs a:hover{color:var(--ink);background:var(--bg)}
+nav.tabs a[aria-current="page"]{color:var(--accent);background:var(--accent-soft)}
+.btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:500;white-space:nowrap}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.primary:hover{filter:brightness(1.07)}
+.btn.danger{color:var(--bad)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.sm{padding:5px 10px;font-size:13px}
+
+main{padding:24px 0 64px}
+.view{display:none;flex-direction:column;gap:20px}
+.view.on{display:flex}
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.head p{margin:4px 0 0;color:var(--muted);max-width:65ch}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px}
+.card > h2{margin-bottom:12px}
+.notice{border-radius:var(--r);padding:12px 14px;background:var(--accent-soft);color:var(--ink);font-size:14px}
+.notice.warn{background:var(--warn-soft)}
+.notice.bad{background:var(--bad-soft)}
+
+/* KPI */
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;display:flex;flex-direction:column;gap:2px}
+.kpi .k{font-size:13px;color:var(--muted)}
+.kpi .v{font-family:var(--f-display);font-size:28px;font-weight:700;line-height:1.15}
+.kpi .s{font-size:13px;color:var(--muted)}
+@media (max-width:820px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* compare columns */
+.cols3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:start}
+@media (max-width:980px){.cols3{grid-template-columns:1fr}}
+.col-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.stripe{border-top:3px solid var(--line)}
+.stripe.good{border-top-color:var(--good)} .stripe.bad{border-top-color:var(--bad)} .stripe.warn{border-top-color:var(--warn)}
+.list{display:flex;flex-direction:column}
+.row{display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding:10px 0;border-top:1px solid var(--line);cursor:pointer;align-items:center}
+.row:first-child{border-top:0}
+.row:hover .rname{color:var(--accent)}
+.rname{font-weight:500}
+.rsub{font-size:13px;color:var(--muted)}
+.rval{text-align:right;font-size:13px}
+.empty{color:var(--muted);font-size:14px;padding:8px 0}
+
+/* chips */
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.chip.good{background:var(--good-soft);color:var(--good)}
+.chip.bad{background:var(--bad-soft);color:var(--bad)}
+.chip.warn{background:var(--warn-soft);color:var(--warn)}
+.chip.neutral{background:var(--bg);color:var(--muted)}
+.chip.accent{background:var(--accent-soft);color:var(--accent)}
+
+/* table */
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.toolbar input[type=search],.toolbar select{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 10px;min-width:180px}
+.toolbar label.tg{display:inline-flex;gap:6px;align-items:center;font-size:14px;color:var(--muted);cursor:pointer}
+.tablebox{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+table.grid{border-collapse:separate;border-spacing:0;width:max-content;min-width:100%;font-size:13.5px}
+table.grid th,table.grid td{padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;text-align:right}
+table.grid thead th{position:sticky;top:0;background:var(--surface);font-weight:600;color:var(--muted);font-size:12.5px;z-index:2}
+table.grid th.mk,table.grid td.mk{position:sticky;left:0;background:var(--surface);text-align:left;z-index:1;min-width:230px;max-width:280px;white-space:normal;border-right:1px solid var(--line)}
+table.grid thead th.mk{z-index:3}
+table.grid tr.cat td{background:var(--bg);font-family:var(--f-display);font-weight:700;font-size:13px;text-align:left;color:var(--ink)}
+table.grid tr.cat td.mk{background:var(--bg)}
+table.grid tbody tr.m{cursor:pointer}
+table.grid tbody tr.m:hover td{background:var(--accent-soft)}
+td.cell.hi,td.cell.lo{color:var(--bad);font-weight:600}
+td.cell .arr{font-size:10px;margin-left:3px}
+td.ref{color:var(--muted);text-align:left!important;font-size:12.5px}
+td.na{color:var(--line)}
+
+/* exams list */
+.exams{display:flex;flex-direction:column}
+.exam{display:grid;grid-template-columns:110px 1fr auto;gap:12px;padding:12px 0;border-top:1px solid var(--line);align-items:center}
+.exam:first-child{border-top:0}
+.exam .d{font-family:var(--f-num);font-size:14px}
+@media (max-width:600px){.exam{grid-template-columns:1fr auto}.exam .d{grid-column:1/-1}}
+.drop{border:2px dashed var(--line);border-radius:var(--r);padding:28px;text-align:center;display:flex;flex-direction:column;gap:8px;align-items:center;background:var(--surface);transition:border-color .15s}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop svg{width:34px;height:34px;color:var(--accent)}
+.progress{display:flex;flex-direction:column;gap:6px}
+.bar{height:6px;border-radius:999px;background:var(--line);overflow:hidden}
+.bar > i{display:block;height:100%;background:var(--accent);width:0;transition:width .3s}
+
+/* modal */
+.scrim{position:fixed;inset:0;background:rgba(10,12,18,.5);display:none;align-items:flex-start;justify-content:center;padding:40px 16px;z-index:50;overflow:auto}
+.scrim.on{display:flex}
+.modal{background:var(--surface);border-radius:14px;max-width:940px;width:100%;padding:22px;display:flex;flex-direction:column;gap:14px;border:1px solid var(--line)}
+.modal.narrow{max-width:460px}
+.modal .acts{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+.rev-exam{border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.rev-head{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 12px;background:var(--bg)}
+.rev-head input[type=date],.rev-head input[type=text]{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:4px 8px}
+.rev-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.rev-tbl td,.rev-tbl th{padding:6px 10px;border-top:1px solid var(--line);text-align:left}
+.rev-tbl input.v{width:96px;border:1px solid var(--line);border-radius:6px;padding:3px 6px;background:var(--surface);font-family:var(--f-num);text-align:right}
+.rev-body{max-height:340px;overflow:auto}
+
+/* detail drawer */
+.detail-grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:16px}
+@media (max-width:820px){.detail-grid{grid-template-columns:1fr}}
+.chart{position:relative}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--surface);font-size:12.5px;padding:6px 8px;border-radius:6px;white-space:nowrap;transform:translate(-50%,-110%);display:none}
+.hist{width:100%;border-collapse:collapse;font-size:13.5px}
+.hist td{padding:6px 0;border-top:1px solid var(--line)}
+.hist td:last-child{text-align:right}
+
+/* arena */
+.rank{display:flex;flex-direction:column}
+.rk{display:grid;grid-template-columns:36px 1fr auto auto;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.rk:first-child{border-top:0}
+.rk .pos{font-family:var(--f-display);font-size:20px;font-weight:700;color:var(--muted);text-align:center}
+.rk.me .nm{color:var(--accent);font-weight:600}
+.meter{width:120px;height:8px;border-radius:999px;background:var(--line);overflow:hidden}
+.meter > i{display:block;height:100%;background:var(--accent);border-radius:999px}
+.vs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+@media (max-width:820px){.vs{grid-template-columns:1fr}}
+.tally{display:flex;align-items:center;justify-content:center;gap:24px;padding:8px 0}
+.tally .big{font-family:var(--f-display);font-size:44px;font-weight:700;line-height:1}
+.tally .who{font-size:13px;color:var(--muted);text-align:center}
+.pill-list{display:flex;flex-wrap:wrap;gap:6px}
+.switch{display:inline-flex;align-items:center;gap:10px;cursor:pointer;font-weight:500}
+.switch input{width:40px;height:22px;appearance:none;background:var(--line);border-radius:999px;position:relative;cursor:pointer;transition:background .15s;margin:0}
+.switch input::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--surface);transition:left .15s}
+.switch input:checked{background:var(--accent)}
+.switch input:checked::after{left:21px}
+.disc{font-size:12.5px;color:var(--muted);max-width:80ch}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M5 23 3.5 10l7 5L16 6l5.5 9 7-5L27 23Z" fill="currentColor" opacity=".18"/><path d="M5 23 3.5 10l7 5L16 6l5.5 9 7-5L27 23Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M13 17.5h6M16 14.5v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M6 27h20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      Health Royale
+    </div>
+    <nav class="tabs" aria-label="Seções">
+      <a href="#painel" data-v="painel">Painel</a>
+      <a href="#tabela" data-v="tabela">Tabela</a>
+      <a href="#exames" data-v="exames">Exames</a>
+      <a href="#arena" data-v="arena">Arena</a>
+    </nav>
+    <button class="btn" id="btnSettings" type="button" aria-label="Configurações">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" stroke="currentColor" stroke-width="2"/></svg>
+      Configurações
+    </button>
+    <button class="btn primary" id="btnAdd" type="button">
+      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      Adicionar exame
+    </button>
+    <input type="file" id="fileIn" accept=".pdf,image/*,.jfif" multiple hidden>
+    <input type="file" id="jsonIn" accept=".json,application/json" hidden>
+  </div>
+</header>
+
+<main class="wrap">
+  <div id="banner"></div>
+
+  <!-- PAINEL -->
+  <section class="view" id="v-painel" aria-labelledby="h-painel">
+    <div class="head">
+      <div>
+        <h1 id="h-painel">Seu progresso</h1>
+        <p id="painelSub">Comparação de cada marcador entre o último exame e o anterior.</p>
+      </div>
+    </div>
+    <div class="kpis" id="kpis"></div>
+    <div class="cols3">
+      <div class="card stripe good"><div class="col-head"><h2>Melhorou</h2><span class="chip good" id="nGood">0</span></div><div class="list" id="lGood"></div></div>
+      <div class="card stripe bad"><div class="col-head"><h2>Piorou</h2><span class="chip bad" id="nBad">0</span></div><div class="list" id="lBad"></div></div>
+      <div class="card stripe warn"><div class="col-head"><h2>Fora da referência</h2><span class="chip warn" id="nOut">0</span></div><div class="list" id="lOut"></div></div>
+    </div>
+    <p class="disc">O Health Royale organiza e compara números; ele não faz diagnóstico. “Melhorou” e “piorou” seguem a faixa de referência do próprio laudo. Converse com seu médico antes de mudar qualquer tratamento.</p>
+  </section>
+
+  <!-- TABELA -->
+  <section class="view" id="v-tabela" aria-labelledby="h-tabela">
+    <div class="head">
+      <div>
+        <h1 id="h-tabela">Todos os resultados</h1>
+        <p>Cada linha é um marcador, cada coluna é uma data de exame. Valores fora da referência aparecem em vermelho com a seta indicando acima ou abaixo. Clique numa linha para ver o gráfico.</p>
+      </div>
+    </div>
+    <div class="toolbar">
+      <input type="search" id="q" placeholder="Buscar marcador…" aria-label="Buscar marcador">
+      <select id="catSel" aria-label="Filtrar por categoria"></select>
+      <label class="tg"><input type="checkbox" id="onlyOut"> Só fora da referência</label>
+    </div>
+    <div class="tablebox"><table class="grid" id="grid"></table></div>
+  </section>
+
+  <!-- EXAMES -->
+  <section class="view" id="v-exames" aria-labelledby="h-exames">
+    <div class="head">
+      <div>
+        <h1 id="h-exames">Arquivo de exames</h1>
+        <p>Envie o PDF do laboratório ou a foto do exame (bioimpedância, por exemplo). O Claude lê o arquivo, mostra o que encontrou para você conferir, e só então arquiva.</p>
+        <p class="small">Seus exames ficam guardados só neste navegador. Exporte um backup de vez em quando e importe-o para usar em outro aparelho.</p>
+      </div>
+      <div class="toolbar">
+        <button class="btn" id="btnExport" type="button">Exportar backup</button>
+        <button class="btn" id="btnImport" type="button">Importar backup</button>
+      </div>
+    </div>
+    <div class="drop" id="drop">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 15V4m0 0L8 8m4-4 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <strong>Arraste PDFs ou imagens de exames aqui</strong>
+      <span class="muted small">ou</span>
+      <button class="btn primary" type="button" id="btnPick">Escolher arquivos</button>
+      <span class="muted small">PDF de laboratório, JPG, PNG ou JFIF. Os resultados anteriores impressos no laudo também são arquivados.</span>
+    </div>
+    <div id="parseStatus"></div>
+    <div class="card"><h2>Exames arquivados</h2><div class="exams" id="examList"></div></div>
+  </section>
+
+  <!-- ARENA -->
+  <section class="view" id="v-arena" aria-labelledby="h-arena">
+    <div class="head">
+      <div>
+        <h1 id="h-arena">Arena</h1>
+        <p>Compare seus exames com amigos sem que ninguém veja os valores de ninguém. Cada marcador vira uma nota de 0 a 100 (de 10 em 10) pela distância da faixa de referência. Vocês trocam um código de cartão com essas notas, e a arena mostra só quem está melhor em cada uma.</p>
+      </div>
+    </div>
+    <div id="arenaBody"></div>
+  </section>
+</main>
+
+<!-- modals -->
+<div class="scrim" id="scrim" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+  <div class="modal" id="modal"></div>
+</div>
+
+<script>
+"use strict";
+/* ------------------------------------------------------------------ catalog */
+const CATALOG = [{"key": "glicose", "name": "Glicose (jejum)", "category": "Glicemia e insulina", "unit": "mg/dL", "better": "range"}, {"key": "lpa", "name": "Lipoproteína (a)", "category": "Lipídios", "unit": "mg/dL", "better": "lower"}, {"key": "amilase", "name": "Amilase", "category": "Fígado e pâncreas", "unit": "U/L", "better": "range"}, {"key": "calcio", "name": "Cálcio", "category": "Eletrólitos e minerais", "unit": "mg/dL", "better": "range"}, {"key": "calcio_ionico", "name": "Cálcio iônico", "category": "Eletrólitos e minerais", "unit": "mg/dL", "better": "range"}, {"key": "ferro", "name": "Ferro sérico", "category": "Eletrólitos e minerais", "unit": "µg/dL", "better": "range"}, {"key": "zinco", "name": "Zinco", "category": "Eletrólitos e minerais", "unit": "µg/dL", "better": "range"}, {"key": "aluminio", "name": "Alumínio", "category": "Eletrólitos e minerais", "unit": "µg/L", "better": "lower"}, {"key": "acido_folico", "name": "Ácido fólico", "category": "Vitaminas", "unit": "ng/mL", "better": "range"}, {"key": "dht", "name": "Di-hidrotestosterona (DHT)", "category": "Hormônios", "unit": "pg/mL", "better": "range"}, {"key": "estriol", "name": "Estriol", "category": "Hormônios", "unit": "ng/mL", "better": "lower"}, {"key": "homocisteina", "name": "Homocisteína", "category": "Lipídios", "unit": "µmol/L", "better": "lower"}, {"key": "bilirrubina_direta", "name": "Bilirrubina direta", "category": "Fígado e pâncreas", "unit": "mg/dL", "better": "lower"}, {"key": "bilirrubina_indireta", "name": "Bilirrubina indireta", "category": "Fígado e pâncreas", "unit": "mg/dL", "better": "lower"}, {"key": "bilirrubina_total", "name": "Bilirrubina total", "category": "Fígado e pâncreas", "unit": "mg/dL", "better": "range"}, {"key": "creatinina", "name": "Creatinina", "category": "Rins", "unit": "mg/dL", "better": "range"}, {"key": "ureia", "name": "Ureia", "category": "Rins", "unit": "mg/dL", "better": "range"}, {"key": "acido_urico", "name": "Ácido úrico", "category": "Rins", "unit": "mg/dL", "better": "range"}, {"key": "sodio", "name": "Sódio", "category": "Eletrólitos e minerais", "unit": "mEq/L", "better": "range"}, {"key": "potassio", "name": "Potássio", "category": "Eletrólitos e minerais", "unit": "mEq/L", "better": "range"}, {"key": "vitamina_a", "name": "Vitamina A", "category": "Vitaminas", "unit": "mg/L", "better": "range"}, {"key": "prolactina", "name": "Prolactina", "category": "Hormônios", "unit": "ng/mL", "better": "range"}, {"key": "colesterol_total", "name": "Colesterol total", "category": "Lipídios", "unit": "mg/dL", "better": "lower"}, {"key": "ldl", "name": "Colesterol LDL", "category": "Lipídios", "unit": "mg/dL", "better": "lower"}, {"key": "hdl", "name": "Colesterol HDL", "category": "Lipídios", "unit": "mg/dL", "better": "higher"}, {"key": "triglicerideos", "name": "Triglicerídeos", "category": "Lipídios", "unit": "mg/dL", "better": "lower"}, {"key": "vitamina_b12", "name": "Vitamina B12", "category": "Vitaminas", "unit": "pg/mL", "better": "range"}, {"key": "glicemia_media", "name": "Glicemia média estimada", "category": "Glicemia e insulina", "unit": "mg/dL", "better": "lower"}, {"key": "vitamina_d", "name": "Vitamina D (25-OH)", "category": "Vitaminas", "unit": "ng/mL", "better": "range"}, {"key": "testosterona_total", "name": "Testosterona total", "category": "Hormônios", "unit": "ng/dL", "better": "range"}, {"key": "tsh", "name": "TSH ultrassensível", "category": "Tireoide", "unit": "µUI/mL", "better": "range"}, {"key": "t4_livre", "name": "T4 livre", "category": "Tireoide", "unit": "ng/dL", "better": "range"}, {"key": "fibrinogenio", "name": "Fibrinogênio", "category": "Coagulação", "unit": "mg/dL", "better": "range"}, {"key": "hba1c", "name": "Hemoglobina glicada (HbA1c)", "category": "Glicemia e insulina", "unit": "%", "better": "lower"}, {"key": "insulina", "name": "Insulina", "category": "Glicemia e insulina", "unit": "µUI/mL", "better": "range"}, {"key": "vldl", "name": "Colesterol VLDL", "category": "Lipídios", "unit": "mg/dL", "better": "lower"}, {"key": "tgo", "name": "TGO / AST", "category": "Fígado e pâncreas", "unit": "U/L", "better": "lower"}, {"key": "tgp", "name": "TGP / ALT", "category": "Fígado e pâncreas", "unit": "U/L", "better": "lower"}, {"key": "ggt", "name": "Gama GT (GGT)", "category": "Fígado e pâncreas", "unit": "U/L", "better": "lower"}, {"key": "pcr", "name": "Proteína C reativa (PCR)", "category": "Inflamação e imunidade", "unit": "mg/L", "better": "lower"}, {"key": "ferritina", "name": "Ferritina", "category": "Eletrólitos e minerais", "unit": "ng/mL", "better": "range"}, {"key": "estradiol", "name": "Estradiol", "category": "Hormônios", "unit": "pg/mL", "better": "range"}, {"key": "shbg", "name": "SHBG", "category": "Hormônios", "unit": "nmol/L", "better": "range"}, {"key": "cortisol", "name": "Cortisol (manhã)", "category": "Hormônios", "unit": "µg/dL", "better": "range"}, {"key": "dheas", "name": "DHEA-S", "category": "Hormônios", "unit": "µg/dL", "better": "range"}, {"key": "t3_livre", "name": "T3 livre", "category": "Tireoide", "unit": "pg/mL", "better": "range"}, {"key": "peso", "name": "Peso", "category": "Composição corporal", "unit": "kg", "better": "range"}, {"key": "massa_muscular_esqueletica", "name": "Massa muscular esquelética", "category": "Composição corporal", "unit": "kg", "better": "higher"}, {"key": "percentual_gordura", "name": "Percentual de gordura (PGC)", "category": "Composição corporal", "unit": "%", "better": "range"}, {"key": "hemacias", "name": "Hemácias", "category": "Hemograma", "unit": "milhões/mm³", "better": "range"}, {"key": "hemoglobina", "name": "Hemoglobina", "category": "Hemograma", "unit": "g/dL", "better": "range"}, {"key": "hematocrito", "name": "Hematócrito", "category": "Hemograma", "unit": "%", "better": "range"}, {"key": "vcm", "name": "VCM", "category": "Hemograma", "unit": "fL", "better": "range"}, {"key": "hcm", "name": "HCM", "category": "Hemograma", "unit": "pg", "better": "range"}, {"key": "chcm", "name": "CHCM", "category": "Hemograma", "unit": "g/dL", "better": "range"}, {"key": "rdw", "name": "RDW", "category": "Hemograma", "unit": "%", "better": "range"}, {"key": "leucocitos", "name": "Leucócitos", "category": "Hemograma", "unit": "/mm³", "better": "range"}, {"key": "neutrofilos", "name": "Neutrófilos", "category": "Hemograma", "unit": "/mm³", "better": "range"}, {"key": "eosinofilos", "name": "Eosinófilos", "category": "Hemograma", "unit": "/mm³", "better": "range"}, {"key": "basofilos", "name": "Basófilos", "category": "Hemograma", "unit": "/mm³", "better": "range"}, {"key": "linfocitos", "name": "Linfócitos", "category": "Hemograma", "unit": "/mm³", "better": "range"}, {"key": "monocitos", "name": "Monócitos", "category": "Hemograma", "unit": "/mm³", "better": "range"}, {"key": "plaquetas", "name": "Plaquetas", "category": "Hemograma", "unit": "mil/mm³", "better": "range"}, {"key": "lipase", "name": "Lipase", "category": "Fígado e pâncreas", "unit": "U/L", "better": "range"}, {"key": "tfg", "name": "Taxa de filtração glomerular", "category": "Rins", "unit": "mL/min/1,73m²", "better": "higher"}, {"key": "fan", "name": "FAN (anticorpos anticélula)", "category": "Inflamação e imunidade", "unit": "", "better": "neutral"}, {"key": "anti_tpo", "name": "Anticorpos anti-TPO", "category": "Tireoide", "unit": "UI/mL", "better": "lower"}, {"key": "anti_tg", "name": "Anticorpos anti-tireoglobulina", "category": "Tireoide", "unit": "UI/mL", "better": "lower"}, {"key": "estrona", "name": "Estrona", "category": "Hormônios", "unit": "pg/mL", "better": "lower"}, {"key": "progesterona", "name": "Progesterona", "category": "Hormônios", "unit": "ng/mL", "better": "range"}, {"key": "t3_reverso", "name": "T3 reverso", "category": "Tireoide", "unit": "ng/mL", "better": "range"}, {"key": "massa_gordura", "name": "Massa de gordura", "category": "Composição corporal", "unit": "kg", "better": "range"}, {"key": "agua_corporal_total", "name": "Água corporal total", "category": "Composição corporal", "unit": "L", "better": "neutral"}, {"key": "proteina_corporal", "name": "Proteína corporal", "category": "Composição corporal", "unit": "kg", "better": "higher"}, {"key": "minerais_corporais", "name": "Minerais corporais", "category": "Composição corporal", "unit": "kg", "better": "higher"}, {"key": "massa_livre_gordura", "name": "Massa livre de gordura", "category": "Composição corporal", "unit": "kg", "better": "higher"}, {"key": "imc", "name": "IMC", "category": "Composição corporal", "unit": "kg/m²", "better": "range"}, {"key": "pontuacao_inbody", "name": "Pontuação InBody", "category": "Composição corporal", "unit": "pontos", "better": "higher"}, {"key": "relacao_cintura_quadril", "name": "Relação cintura-quadril", "category": "Composição corporal", "unit": "", "better": "range"}, {"key": "gordura_visceral", "name": "Nível de gordura visceral", "category": "Composição corporal", "unit": "nível", "better": "lower"}, {"key": "taxa_metabolica_basal", "name": "Taxa metabólica basal", "category": "Composição corporal", "unit": "kcal", "better": "neutral"}, {"key": "grau_obesidade", "name": "Grau de obesidade", "category": "Composição corporal", "unit": "%", "better": "range"}, {"key": "smi", "name": "SMI (índice de massa muscular)", "category": "Composição corporal", "unit": "kg/m²", "better": "higher"}];
+const CATEGORIES = ["Composição corporal","Hemograma","Coagulação","Glicemia e insulina","Lipídios","Fígado e pâncreas","Rins","Inflamação e imunidade","Eletrólitos e minerais","Vitaminas","Hormônios","Tireoide","Urina","Outros"];
+
+/* ------------------------------------------------------------------ utils */
+const $ = s => document.querySelector(s);
+const el = (tag, attrs = {}, ...kids) => {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v == null || v === false) continue;
+    if (k === "class") n.className = v;
+    else if (k === "text") n.textContent = v;
+    else if (k === "html") n.innerHTML = v;
+    else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+    else n.setAttribute(k, v === true ? "" : v);
+  }
+  for (const c of kids.flat()) if (c != null && c !== false) n.append(c instanceof Node ? c : document.createTextNode(String(c)));
+  return n;
+};
+const nf = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 });
+const fmt = v => v == null || !isFinite(v) ? "—" : nf.format(v);
+const fmtDate = s => s ? s.slice(8, 10) + "/" + s.slice(5, 7) + "/" + s.slice(0, 4) : "—";
+const fmtDateShort = s => s ? s.slice(8, 10) + "/" + s.slice(5, 7) + "/" + s.slice(2, 4) : "—";
+const norm = s => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+const slug = s => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 60);
+const num = v => { if (v == null || v === "") return null; if (typeof v === "number") return isFinite(v) ? v : null;
+  let s = String(v).trim().replace(/[^\d,.\-]/g, ""); if (!s) return null;
+  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", "."); const n = parseFloat(s); return isFinite(n) ? n : null; };
+const isDate = s => /^\d{4}-\d{2}-\d{2}$/.test(s || "");
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+const catalogByKey = Object.fromEntries(CATALOG.map(c => [c.key, c]));
+const catalogByName = Object.fromEntries(CATALOG.map(c => [norm(c.name), c.key]));
+
+/* ------------------------------------------------------------------ store */
+// Private per-person storage: data/users/<id>/<docId>. Falls back to this browser when the page runs outside Claude.
+const Store = {
+  mode: "none", uid: null, db: null, col: null, docs: new Map(), settings: {}, listeners: [],
+  onChange(fn) { this.listeners.push(fn); },
+  emit() { for (const fn of this.listeners) fn(); },
+  async init() {
+    this.mode = "local";
+    try { const raw = localStorage.getItem("health-royale"); if (raw) { const o = JSON.parse(raw); this.docs = new Map(Object.entries(o.docs || {})); this.settings = o.settings || {}; } }
+    catch (e) { Banner.show("Este navegador não permite guardar dados (modo privado?). Os exames somem ao fechar a página; use Exportar backup.", "warn"); }
+  },
+  persistLocal() { try { localStorage.setItem("health-royale", JSON.stringify({ docs: Object.fromEntries(this.docs), settings: this.settings })); } catch (e) { Banner.show("Não foi possível guardar neste navegador. Exporte um backup para não perder os dados.", "bad"); } },
+  async put(id, data) { this.docs.set(id, data); this.persistLocal(); this.emit(); },
+  async remove(id) { this.docs.delete(id); this.persistLocal(); this.emit(); },
+  async saveSettings(s) { this.settings = { ...this.settings, ...s }; this.persistLocal(); },
+  exams() { return [...this.docs.values()].filter(e => e && isDate(e.date)).sort((a, b) => a.date.localeCompare(b.date)); }
+};
+
+const Banner = {
+  show(msg, kind = "") { const b = $("#banner"); b.replaceChildren(el("div", { class: "notice " + kind, role: "status", text: msg })); b.style.marginBottom = "16px"; },
+  clear() { $("#banner").replaceChildren(); $("#banner").style.marginBottom = "0"; }
+};
+
+/* ------------------------------------------------------------------ analysis */
+function statusOf(r) {
+  if (r.value == null) return r.text ? "text" : "na";
+  const lo = r.refLow, hi = r.refHigh;
+  if (lo == null && hi == null) return "none";
+  if (lo != null && r.value < lo) return "lo";
+  if (hi != null && r.value > hi) return "hi";
+  return "ok";
+}
+function distOut(v, lo, hi) { if (lo != null && v < lo) return lo - v; if (hi != null && v > hi) return v - hi; return 0; }
+
+// Compare two consecutive values of one marker. Returns improved | worsened | same | stable | changed
+function judge(prev, cur, meta) {
+  if (prev?.value == null || cur?.value == null) return null;
+  const a = prev.value, b = cur.value, delta = b - a;
+  const rel = Math.abs(delta) / (Math.abs(a) || 1);
+  if (Math.abs(delta) < 1e-9 || rel < 0.005) return "same";
+  const lo = meta.refLow, hi = meta.refHigh;
+  if (meta.better === "lower") return delta < 0 ? "improved" : "worsened";
+  if (meta.better === "higher") return delta > 0 ? "improved" : "worsened";
+  if (meta.better === "range" && (lo != null || hi != null)) {
+    const d0 = distOut(a, lo, hi), d1 = distOut(b, lo, hi);
+    if (d1 < d0 - 1e-9) return "improved";
+    if (d1 > d0 + 1e-9) return "worsened";
+    return "stable";
+  }
+  return "changed";
+}
+
+// Build one series per marker from all archived exams.
+function buildSeries(exams) {
+  const map = new Map();
+  for (const ex of exams) for (const r of ex.results || []) {
+    if (!r || !r.key) continue;
+    let s = map.get(r.key);
+    if (!s) { s = { key: r.key, pts: [] }; map.set(r.key, s); }
+    s.pts.push({ date: ex.date, value: r.value ?? null, text: r.text ?? null, examId: ex.id, r });
+  }
+  for (const s of map.values()) {
+    s.pts.sort((a, b) => a.date.localeCompare(b.date));
+    // drop duplicates on the same date (keep last written)
+    s.pts = s.pts.filter((p, i, arr) => i === arr.length - 1 || arr[i + 1].date !== p.date);
+    const last = s.pts[s.pts.length - 1].r, cat = catalogByKey[s.key] || {};
+    s.name = last.name || cat.name || s.key;
+    s.category = last.category || cat.category || "Outros";
+    s.unit = last.unit ?? cat.unit ?? "";
+    s.refLow = last.refLow ?? null; s.refHigh = last.refHigh ?? null; s.refText = last.refText || "";
+    s.better = last.better || cat.better || "range";
+    s.last = s.pts[s.pts.length - 1];
+    const numeric = s.pts.filter(p => p.value != null);
+    s.prev = numeric.length >= 2 ? numeric[numeric.length - 2] : null;
+    s.lastNum = numeric.length ? numeric[numeric.length - 1] : null;
+    s.status = statusOf({ value: s.last.value, text: s.last.text, refLow: s.refLow, refHigh: s.refHigh });
+    s.trend = s.prev ? judge(s.prev, s.lastNum, s) : null;
+  }
+  return [...map.values()];
+}
+
+// Arena score 0–100: 100 = ideal; below 80 = outside the reference. Published rounded to steps of 10.
+function scoreOf(s) {
+  const v = s.last?.value; const lo = s.refLow, hi = s.refHigh;
+  if (v == null || s.better === "neutral" || (lo == null && hi == null)) return null;
+  const clamp = x => Math.max(0, Math.min(100, x));
+  if (lo != null && hi != null) {
+    const w = (hi - lo) || Math.abs(hi) || 1;
+    if (v >= lo && v <= hi) {
+      if (s.better === "lower") return clamp(80 + 20 * (hi - v) / w);
+      if (s.better === "higher") return clamp(80 + 20 * (v - lo) / w);
+      return 100;
+    }
+    return clamp(79 * (1 - Math.min(1, distOut(v, lo, hi) / w)));
+  }
+  if (hi != null) { const H = Math.abs(hi) || 1; return v <= hi ? clamp(80 + 20 * (1 - v / H)) : clamp(79 * (1 - Math.min(1, (v - hi) / H))); }
+  const L = Math.abs(lo) || 1; return v >= lo ? clamp(80 + 20 * Math.min(1, (v - lo) / L)) : clamp(79 * Math.max(0, v / L));
+}
+const round10 = x => Math.round(x / 10) * 10;
+
+/* ------------------------------------------------------------------ charts */
+function niceTicks(min, max, n = 4) {
+  if (min === max) { min -= 1; max += 1; }
+  const span = max - min, step0 = span / n, mag = Math.pow(10, Math.floor(Math.log10(step0)));
+  const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(st => st >= step0) || 10 * mag;
+  const t0 = Math.floor(min / step) * step, out = [];
+  for (let t = t0; t <= max + step * 0.001; t += step) out.push(+t.toFixed(10));
+  return out;
+}
+function sparkline(s, w = 92, h = 26) {
+  const pts = s.pts.filter(p => p.value != null);
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`); svg.setAttribute("width", w); svg.setAttribute("height", h); svg.setAttribute("aria-hidden", "true");
+  if (pts.length < 2) return svg;
+  const vals = pts.map(p => p.value); let lo = Math.min(...vals), hi = Math.max(...vals);
+  if (lo === hi) { lo -= 1; hi += 1; }
+  const t = pts.map(p => Date.parse(p.date)), t0 = t[0], t1 = t[t.length - 1] || t0 + 1;
+  const X = x => 3 + (w - 6) * ((x - t0) / ((t1 - t0) || 1)), Y = v => h - 4 - (h - 8) * ((v - lo) / (hi - lo));
+  const d = pts.map((p, i) => (i ? "L" : "M") + X(t[i]).toFixed(1) + " " + Y(p.value).toFixed(1)).join(" ");
+  svg.innerHTML = `<path d="${d}" fill="none" stroke="var(--accent)" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" opacity=".85"/>` +
+    `<circle cx="${X(t[t.length - 1]).toFixed(1)}" cy="${Y(vals[vals.length - 1]).toFixed(1)}" r="2.8" fill="var(--accent)"/>`;
+  return svg;
+}
+function bigChart(s) {
+  const box = el("div", { class: "chart" });
+  const pts = s.pts.filter(p => p.value != null);
+  if (!pts.length) { box.append(el("p", { class: "muted", text: "Resultado sem valor numérico para desenhar." })); return box; }
+  const W = 640, H = 260, L = 52, R = 18, T = 18, B = 34;
+  const vals = pts.map(p => p.value);
+  let lo = Math.min(...vals, ...(s.refLow != null ? [s.refLow] : []), ...(s.refHigh != null ? [s.refHigh] : []));
+  let hi = Math.max(...vals, ...(s.refLow != null ? [s.refLow] : []), ...(s.refHigh != null ? [s.refHigh] : []));
+  const pad = (hi - lo) * 0.12 || Math.abs(hi) * 0.1 || 1; lo -= pad; hi += pad;
+  if (Math.min(...vals) >= 0 && lo < 0) lo = 0;
+  const ticks = niceTicks(lo, hi); lo = Math.min(lo, ticks[0]); hi = Math.max(hi, ticks[ticks.length - 1]);
+  const t = pts.map(p => Date.parse(p.date)); const t0 = t[0], t1 = t[t.length - 1];
+  const X = x => pts.length === 1 ? L + (W - L - R) / 2 : L + (W - L - R) * ((x - t0) / ((t1 - t0) || 1));
+  const Y = v => T + (H - T - B) * (1 - (v - lo) / (hi - lo));
+  let g = "";
+  for (const tk of ticks) { if (tk < lo || tk > hi) continue; g += `<line x1="${L}" x2="${W - R}" y1="${Y(tk)}" y2="${Y(tk)}" stroke="var(--line)" stroke-width="1"/><text x="${L - 8}" y="${Y(tk) + 4}" text-anchor="end" font-size="11" fill="var(--muted)" font-family="var(--f-num)">${fmt(tk)}</text>`; }
+  if (s.refLow != null || s.refHigh != null) {
+    const yTop = Y(s.refHigh != null ? s.refHigh : hi), yBot = Y(s.refLow != null ? s.refLow : lo);
+    g = `<rect x="${L}" y="${yTop}" width="${W - L - R}" height="${Math.max(0, yBot - yTop)}" fill="var(--band)"/>` + g +
+      `<text x="${W - R - 4}" y="${yTop + 13}" text-anchor="end" font-size="11" fill="var(--good)">faixa de referência</text>`;
+  }
+  const step = Math.max(1, Math.ceil(pts.length / 7));
+  pts.forEach((p, i) => { if (i % step === 0 || i === pts.length - 1) g += `<text x="${X(t[i])}" y="${H - 10}" text-anchor="middle" font-size="11" fill="var(--muted)" font-family="var(--f-num)">${fmtDateShort(p.date)}</text>`; });
+  const d = pts.map((p, i) => (i ? "L" : "M") + X(t[i]).toFixed(1) + " " + Y(p.value).toFixed(1)).join(" ");
+  g += `<path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+  pts.forEach((p, i) => { const st = statusOf({ value: p.value, refLow: s.refLow, refHigh: s.refHigh }); const last = i === pts.length - 1;
+    g += `<circle cx="${X(t[i])}" cy="${Y(p.value)}" r="${last ? 5.5 : 4}" fill="${st === "hi" || st === "lo" ? "var(--bad)" : "var(--accent)"}" stroke="var(--surface)" stroke-width="2"/>`; });
+  const lp = pts[pts.length - 1];
+  g += `<text x="${Math.min(X(t[t.length - 1]), W - R - 2)}" y="${Y(lp.value) - 12}" text-anchor="end" font-size="12.5" font-weight="600" fill="var(--ink)" font-family="var(--f-num)">${fmt(lp.value)}</text>`;
+  g += `<line id="xh" x1="0" x2="0" y1="${T}" y2="${H - B}" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 3" visibility="hidden"/>`;
+  g += `<rect x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}" fill="transparent" id="hit"/>`;
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", `${s.name}: ${pts.map(p => fmtDate(p.date) + " " + fmt(p.value)).join("; ")}`);
+  svg.innerHTML = g; box.append(svg);
+  const tip = el("div", { class: "tip" }); box.append(tip);
+  const hit = svg.querySelector("#hit"), xh = svg.querySelector("#xh");
+  const move = ev => {
+    const rect = svg.getBoundingClientRect(), sx = (ev.clientX - rect.left) * (W / rect.width);
+    let bi = 0, bd = Infinity; pts.forEach((p, i) => { const dd = Math.abs(X(t[i]) - sx); if (dd < bd) { bd = dd; bi = i; } });
+    const p = pts[bi], px = X(t[bi]) * rect.width / W, py = Y(p.value) * rect.height / H;
+    xh.setAttribute("x1", X(t[bi])); xh.setAttribute("x2", X(t[bi])); xh.setAttribute("visibility", "visible");
+    tip.textContent = `${fmtDate(p.date)} · ${p.text || fmt(p.value)} ${s.unit || ""}`; tip.style.left = px + "px"; tip.style.top = py + "px"; tip.style.display = "block";
+  };
+  hit.addEventListener("pointermove", move); hit.addEventListener("pointerdown", move);
+  hit.addEventListener("pointerleave", () => { tip.style.display = "none"; xh.setAttribute("visibility", "hidden"); });
+  return box;
+}
+
+/* ------------------------------------------------------------------ chips */
+const STATUS_CHIP = { hi: ["bad", "▲ Acima"], lo: ["bad", "▼ Abaixo"], ok: ["good", "● Na faixa"], none: ["neutral", "Sem referência"], text: ["neutral", "Qualitativo"], na: ["neutral", "—"] };
+const TREND_CHIP = { improved: ["good", "↗ Melhorou"], worsened: ["bad", "↘ Piorou"], same: ["neutral", "= Igual"], stable: ["neutral", "≈ Estável na faixa"], changed: ["neutral", "Mudou"] };
+const chip = ([k, t]) => el("span", { class: "chip " + k, text: t });
+const refLabel = s => s.refText || (s.refLow != null && s.refHigh != null ? `${fmt(s.refLow)} a ${fmt(s.refHigh)}` : s.refHigh != null ? `até ${fmt(s.refHigh)}` : s.refLow != null ? `acima de ${fmt(s.refLow)}` : "");
+const valueLabel = p => p ? (p.text || fmt(p.value)) : "—";
+
+/* ------------------------------------------------------------------ render: painel */
+let SERIES = [];
+function renderPainel() {
+  const exams = Store.exams();
+  const kp = $("#kpis"); kp.replaceChildren();
+  const out = SERIES.filter(s => s.status === "hi" || s.status === "lo");
+  const lastEx = exams[exams.length - 1];
+  const tile = (k, v, s) => el("div", { class: "kpi" }, el("span", { class: "k", text: k }), el("span", { class: "v num", text: v }), el("span", { class: "s", text: s }));
+  kp.append(
+    tile("Exames arquivados", String(exams.length), exams.length ? `desde ${fmtDate(exams[0].date)}` : "nenhum ainda"),
+    tile("Marcadores acompanhados", String(SERIES.length), `${SERIES.filter(s => s.pts.length > 1).length} com histórico`),
+    tile("Último exame", lastEx ? fmtDateShort(lastEx.date) : "—", lastEx ? lastEx.type : ""),
+    tile("Fora da referência agora", String(out.length), SERIES.length ? `de ${SERIES.filter(s => s.status !== "none" && s.status !== "text" && s.status !== "na").length} com faixa` : "")
+  );
+  if (!exams.length) {
+    $("#painelSub").textContent = "Adicione seu primeiro exame para começar a acompanhar.";
+  } else $("#painelSub").textContent = "Cada marcador comparado entre o resultado mais recente e o anterior dele.";
+  const rel = s => s.prev && s.lastNum ? Math.abs((s.lastNum.value - s.prev.value) / (Math.abs(s.prev.value) || 1)) : 0;
+  const good = SERIES.filter(s => s.trend === "improved").sort((a, b) => rel(b) - rel(a));
+  const bad = SERIES.filter(s => s.trend === "worsened").sort((a, b) => rel(b) - rel(a));
+  const outS = out.slice().sort((a, b) => (CATEGORIES.indexOf(a.category) - CATEGORIES.indexOf(b.category)) || a.name.localeCompare(b.name));
+  $("#nGood").textContent = good.length; $("#nBad").textContent = bad.length; $("#nOut").textContent = outS.length;
+  const row = (s, mode) => {
+    const right = mode === "out"
+      ? el("div", { class: "rval" }, el("div", { class: "num", text: `${valueLabel(s.last)} ${s.unit}` }), chip(STATUS_CHIP[s.status]))
+      : el("div", { class: "rval" }, el("div", { class: "num" }, `${fmt(s.prev.value)} → `, el("strong", { text: fmt(s.lastNum.value) })), el("div", { class: "muted", text: s.unit }));
+    return el("div", { class: "row", tabindex: "0", role: "button", onclick: () => openDetail(s.key), onkeydown: e => { if (e.key === "Enter") openDetail(s.key); } },
+      el("div", {}, el("div", { class: "rname", text: s.name }),
+        el("div", { class: "rsub", text: mode === "out" ? `Ref.: ${refLabel(s)} · ${fmtDate(s.last.date)}` : `${fmtDate(s.prev.date)} → ${fmtDate(s.lastNum.date)}` })),
+      right);
+  };
+  const fill = (id, arr, mode, emptyMsg) => { const n = $(id); n.replaceChildren(...(arr.length ? arr.map(s => row(s, mode)) : [el("div", { class: "empty", text: emptyMsg })])); };
+  fill("#lGood", good, "trend", exams.length ? "Nenhum marcador melhorou desde o exame anterior." : "Sem exames ainda.");
+  fill("#lBad", bad, "trend", exams.length ? "Nenhum marcador piorou." : "Sem exames ainda.");
+  fill("#lOut", outS, "out", exams.length ? "Tudo dentro da referência." : "Sem exames ainda.");
+}
+
+/* ------------------------------------------------------------------ render: tabela */
+function renderTabela() {
+  const sel = $("#catSel"), cur = sel.value;
+  const cats = CATEGORIES.filter(c => SERIES.some(s => s.category === c)).concat([...new Set(SERIES.map(s => s.category))].filter(c => !CATEGORIES.includes(c)));
+  sel.replaceChildren(el("option", { value: "", text: "Todas as categorias" }), ...cats.map(c => el("option", { value: c, text: c })));
+  sel.value = cats.includes(cur) ? cur : "";
+  const q = norm($("#q").value), cat = sel.value, onlyOut = $("#onlyOut").checked;
+  const dates = [...new Set(Store.exams().map(e => e.date))].sort().reverse();
+  const tbl = $("#grid"); tbl.replaceChildren();
+  const thead = el("thead", {}, el("tr", {}, el("th", { class: "mk", text: "Marcador" }), el("th", { text: "Tendência" }), el("th", { text: "Referência", style: "text-align:left" }), ...dates.map(d => el("th", { class: "num", text: fmtDateShort(d) }))));
+  const tb = el("tbody");
+  const list = SERIES.filter(s => (!q || norm(s.name).includes(q) || norm(s.key).includes(q)) && (!cat || s.category === cat) && (!onlyOut || s.status === "hi" || s.status === "lo"));
+  for (const c of cats) {
+    const rows = list.filter(s => s.category === c).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+    if (!rows.length) continue;
+    tb.append(el("tr", { class: "cat" }, el("td", { class: "mk", text: c }), el("td", { colspan: String(dates.length + 2) })));
+    for (const s of rows) {
+      const byDate = Object.fromEntries(s.pts.map(p => [p.date, p]));
+      const tr = el("tr", { class: "m", tabindex: "0", onclick: () => openDetail(s.key), onkeydown: e => { if (e.key === "Enter") openDetail(s.key); } },
+        el("td", { class: "mk" }, el("div", { style: "font-weight:500", text: s.name }), el("div", { class: "muted small", text: s.unit || "" })),
+        el("td", {}, sparkline(s)),
+        el("td", { class: "ref", text: refLabel(s) }));
+      for (const d of dates) {
+        const p = byDate[d];
+        if (!p) { tr.append(el("td", { class: "na", text: "·" })); continue; }
+        const st = statusOf({ value: p.value, text: p.text, refLow: s.refLow, refHigh: s.refHigh });
+        const td = el("td", { class: "cell num " + st, title: st === "hi" ? "Acima da referência" : st === "lo" ? "Abaixo da referência" : "" }, valueLabel(p));
+        if (st === "hi") td.append(el("span", { class: "arr", text: "▲" })); if (st === "lo") td.append(el("span", { class: "arr", text: "▼" }));
+        tr.append(td);
+      }
+      tb.append(tr);
+    }
+  }
+  tbl.append(thead, tb);
+  if (!list.length) tbl.append(el("tbody", {}, el("tr", {}, el("td", { class: "mk", colspan: String(dates.length + 3), text: SERIES.length ? "Nenhum marcador com esse filtro." : "Nenhum exame arquivado ainda." }))));
+}
+
+/* ------------------------------------------------------------------ render: exames */
+function renderExames() {
+  const list = $("#examList"); const exams = Store.exams().slice().reverse();
+  if (!exams.length) {
+    list.replaceChildren(el("div", { class: "empty" }, "Nenhum exame arquivado. ",
+      "Envie um PDF ou uma foto de exame acima, ou use “Importar backup” se já tiver um arquivo do Health Royale."));
+    return;
+  }
+  list.replaceChildren(...exams.map(ex => {
+    const outN = (ex.results || []).filter(r => { const st = statusOf(r); return st === "hi" || st === "lo"; }).length;
+    return el("div", { class: "exam" },
+      el("div", { class: "d", text: fmtDate(ex.date) }),
+      el("div", {}, el("div", { style: "font-weight:500", text: `${ex.type} · ${ex.source || "sem origem"}` }),
+        el("div", { class: "muted small" }, `${(ex.results || []).length} resultados`, outN ? ` · ${outN} fora da referência` : "", ex.fileName ? ` · ${ex.fileName}` : "")),
+      el("button", { class: "btn sm danger", type: "button", onclick: () => askDelete(ex) }, "Excluir"));
+  }));
+}
+function askDelete(ex) {
+  openModal(el("div", { class: "modal narrow" },
+    el("h2", { id: "mTitle", text: "Excluir este exame?" }),
+    el("p", { class: "muted", text: `${ex.type} de ${fmtDate(ex.date)} com ${(ex.results || []).length} resultados sai do arquivo e da tabela. Não dá para desfazer, a não ser por um backup.` }),
+    el("div", { class: "acts" }, el("button", { class: "btn", type: "button", onclick: closeModal }, "Cancelar"),
+      el("button", { class: "btn primary", type: "button", onclick: async () => { closeModal(); try { await Store.remove(ex.id); afterDataChange(); } catch (e) { Banner.show("Não foi possível excluir: " + (e.message || e.code), "bad"); } } }, "Excluir"))), true);
+}
+
+/* ------------------------------------------------------------------ detail */
+function openDetail(key) {
+  const s = SERIES.find(x => x.key === key); if (!s) return;
+  const hist = el("table", { class: "hist" }, el("tbody", {}, ...s.pts.slice().reverse().map(p => {
+    const st = statusOf({ value: p.value, text: p.text, refLow: s.refLow, refHigh: s.refHigh });
+    return el("tr", {}, el("td", { class: "num", text: fmtDate(p.date) }), el("td", { class: "num", style: (st === "hi" || st === "lo") ? "color:var(--bad);font-weight:600" : "" }, valueLabel(p), st === "hi" ? " ▲" : st === "lo" ? " ▼" : ""));
+  })));
+  openModal(el("div", { class: "modal" },
+    el("div", { class: "head" },
+      el("div", {}, el("div", { class: "muted small", text: s.category }), el("h2", { id: "mTitle", text: s.name }),
+        el("div", { class: "toolbar", style: "margin-top:6px" }, chip(STATUS_CHIP[s.status]), s.trend ? chip(TREND_CHIP[s.trend]) : null,
+          el("span", { class: "muted small", text: `Referência: ${refLabel(s) || "não informada"} ${s.unit || ""}` }))),
+      el("button", { class: "btn", type: "button", onclick: closeModal }, "Fechar")),
+    el("div", { class: "detail-grid" },
+      el("div", {}, bigChart(s)),
+      el("div", {}, el("h3", { style: "margin-bottom:4px", text: "Histórico" }), hist))));
+}
+
+/* ------------------------------------------------------------------ modal */
+let lastFocus = null;
+function openModal(node, small) { lastFocus = document.activeElement; const sc = $("#scrim"); sc.replaceChildren(node); sc.classList.add("on"); const f = node.querySelector("button, input"); if (f) f.focus(); }
+function closeModal() { $("#scrim").classList.remove("on"); $("#scrim").replaceChildren(); if (lastFocus) lastFocus.focus?.(); }
+$("#scrim").addEventListener("click", e => { if (e.target.id === "scrim" && !PENDING) closeModal(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && $("#scrim").classList.contains("on") && !PENDING) closeModal(); });
+
+/* ------------------------------------------------------------------ AI (Claude API, chave do próprio usuário) */
+const MODELS = [["claude-sonnet-5-5", "Claude Sonnet 5.5 (recomendado)"], ["claude-opus-5-5", "Claude Opus 5.5 (mais preciso, mais caro)"], ["claude-haiku-5-5", "Claude Haiku 5.5 (mais rápido e barato)"]];
+const AI = {
+  key() { try { return localStorage.getItem("hr-api-key") || ""; } catch (e) { return ""; } },
+  model() { try { return localStorage.getItem("hr-model") || MODELS[0][0]; } catch (e) { return MODELS[0][0]; } },
+  async ask(prompt, { images = [], pdf = null } = {}) {
+    const content = [];
+    for (const b of images) content.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: await blobToB64(b) } });
+    if (pdf) content.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: await blobToB64(pdf) } });
+    content.push({ type: "text", text: prompt });
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const r = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-api-key": this.key(), "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+        body: JSON.stringify({ model: this.model(), max_tokens: 16000, messages: [{ role: "user", content }] })
+      });
+      if (r.ok) { const j = await r.json(); return { text: (j.content || []).filter(c => c.type === "text").map(c => c.text).join(""), stop: j.stop_reason }; }
+      let msg = ""; try { msg = (await r.json())?.error?.message || ""; } catch (e) {}
+      if ((r.status === 429 || r.status === 529 || r.status >= 500) && attempt < 2) { await sleep(6000 * (attempt + 1)); continue; }
+      if (r.status === 401) throw new Error("A chave da API foi recusada. Confira em Configurações.");
+      if (r.status === 400 && /credit|billing/i.test(msg)) throw new Error("Sua conta da API está sem créditos. Adicione créditos no console da Anthropic.");
+      throw new Error(msg || "Erro " + r.status + " na API do Claude.");
+    }
+  }
+};
+function blobToB64(blob) { return new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(",")[1]); fr.onerror = () => rej(fr.error); fr.readAsDataURL(blob); }); }
+
+function openSettings(reason) {
+  const keyIn = el("input", { type: "password", id: "setKey", autocomplete: "off", placeholder: "sk-ant-…", value: AI.key(), style: "width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 10px;background:var(--surface);font-family:var(--f-num)" });
+  const modelSel = el("select", { id: "setModel", style: "width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 10px;background:var(--surface)" }, ...MODELS.map(([v, t]) => el("option", { value: v, text: t, selected: v === AI.model() || null })));
+  const show = el("label", { class: "tg small muted", style: "display:inline-flex;gap:6px;align-items:center;cursor:pointer" }, el("input", { type: "checkbox", id: "setShow", onchange: e => { keyIn.type = e.target.checked ? "text" : "password"; } }), "Mostrar chave");
+  openModal(el("div", { class: "modal narrow" },
+    el("h2", { id: "mTitle", text: "Configurações" }),
+    reason ? el("div", { class: "notice warn", text: reason }) : null,
+    el("div", { style: "display:flex;flex-direction:column;gap:6px" },
+      el("label", { for: "setKey", style: "font-weight:600", text: "Chave da API do Claude" }), keyIn, show,
+      el("p", { class: "small muted", style: "margin:0" }, "A leitura dos exames usa a sua própria chave da API da Anthropic. Ela fica guardada só neste navegador e só é enviada para api.anthropic.com. Crie uma em ",
+        el("a", { href: "https://console.anthropic.com/settings/keys", target: "_blank", rel: "noopener", text: "console.anthropic.com" }), ". Cada leitura consome créditos da sua conta.")),
+    el("div", { style: "display:flex;flex-direction:column;gap:6px" }, el("label", { for: "setModel", style: "font-weight:600", text: "Modelo" }), modelSel),
+    el("div", { class: "acts" },
+      el("button", { class: "btn danger", type: "button", onclick: () => { try { localStorage.removeItem("hr-api-key"); } catch (e) {} keyIn.value = ""; } }, "Apagar chave"),
+      el("button", { class: "btn", type: "button", onclick: closeModal }, "Cancelar"),
+      el("button", { class: "btn primary", type: "button", onclick: () => { try { if (keyIn.value.trim()) localStorage.setItem("hr-api-key", keyIn.value.trim()); localStorage.setItem("hr-model", modelSel.value); } catch (e) {} closeModal(); } }, "Salvar"))));
+}
+
+/* ------------------------------------------------------------------ file reading */
+let PDFJS = null;
+function loadScript(src) { return new Promise((res, rej) => { const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = () => rej(new Error("não carregou " + src)); document.head.append(s); }); }
+async function getPdfJs() {
+  if (PDFJS) return PDFJS;
+  const base = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
+  await loadScript(base + "pdf.min.js");
+  await loadScript(base + "pdf.worker.min.js"); // runs in the page, no separate worker needed
+  PDFJS = window.pdfjsLib; PDFJS.GlobalWorkerOptions.workerSrc = base + "pdf.worker.min.js";
+  return PDFJS;
+}
+async function pdfToPages(file) {
+  const lib = await getPdfJs();
+  const doc = await lib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+  const pages = [];
+  for (let i = 1; i <= doc.numPages; i++) {
+    const pg = await doc.getPage(i); const tc = await pg.getTextContent();
+    const lines = new Map();
+    for (const it of tc.items) { if (!it.str) continue; const y = Math.round(it.transform[5] / 3) * 3; if (!lines.has(y)) lines.set(y, []); lines.get(y).push({ x: it.transform[4], s: it.str }); }
+    const text = [...lines.entries()].sort((a, b) => b[0] - a[0]).map(([, its]) => its.sort((a, b) => a.x - b.x).map(o => o.s).join(" ").replace(/\s+/g, " ").trim()).filter(Boolean).join("\n");
+    pages.push({ n: i, text, page: pg });
+  }
+  return { doc, pages };
+}
+async function pageToImage(pg, maxW = 1600) {
+  const vp0 = pg.getViewport({ scale: 1 }); const scale = Math.min(2.2, maxW / vp0.width); const vp = pg.getViewport({ scale });
+  const c = document.createElement("canvas"); c.width = vp.width; c.height = vp.height;
+  await pg.render({ canvasContext: c.getContext("2d"), viewport: vp }).promise;
+  return await new Promise(r => c.toBlob(r, "image/jpeg", 0.88));
+}
+async function imageFileToBlob(file, maxSide = 2000) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error("imagem ilegível")); i.src = url; });
+    const sc = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement("canvas"); c.width = Math.round(img.naturalWidth * sc); c.height = Math.round(img.naturalHeight * sc);
+    const ctx = c.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height); ctx.drawImage(img, 0, 0, c.width, c.height);
+    return await new Promise(r => c.toBlob(r, "image/jpeg", 0.9));
+  } finally { URL.revokeObjectURL(url); }
+}
+
+function buildPrompt(part, total, isImage) {
+  const keys = CATALOG.map(c => `${c.key}|${c.name}`).join("\n");
+  return `Você extrai dados de exames médicos para um app pessoal de acompanhamento. ${isImage ? "Leia o arquivo anexado do exame (imagem ou PDF)." : `Leia o texto abaixo, extraído de um laudo em PDF (parte ${part} de ${total}).`}
+Devolva SOMENTE um JSON válido, sem texto antes ou depois, no formato:
+{"patient":"nome ou null","exams":[{"date":"AAAA-MM-DD","type":"Laboratorial|Bioimpedância|Imagem|Outro","source":"laboratório ou equipamento","results":[{"key":"snake_case","name":"Nome legível","category":"...","value":123.4,"text":null,"unit":"mg/dL","refLow":null,"refHigh":100,"refText":"< 100","better":"lower|higher|range|neutral"}]}]}
+
+Regras:
+- date = data da coleta ou da realização. Datas dd/mm/aa viram 20aa-mm-dd.
+- Números sempre com ponto decimal: "1.163,2" vira 1163.2; "6.100 /mm³" vira 6100.
+- No leucograma use o valor absoluto (/mm³), não o percentual.
+- Quando aparecer "Resultados anteriores" ou um gráfico histórico com datas, crie um item em "exams" para cada data anterior (mesmo key, unidade e referência). Datas de gráfico e valores do gráfico só se der para casar valor e data com segurança.
+- Resultado qualitativo ("Não reagente") → value null e text com o resultado. "< 15,00" → value 15 e text "< 15,00". "> 90" → value 90 e text "> 90".
+- Referência "< X" → refHigh X; "> X" → refLow X; "A a B" → refLow A e refHigh B. Havendo várias faixas, use a do sexo e idade do paciente; refText repete a faixa como está no laudo.
+- better: "lower" quando menor é melhor (LDL, triglicerídeos, PCR, glicada, gordura, gordura visceral), "higher" quando maior é melhor (HDL, massa muscular, pontuação), "range" quando o ideal é ficar dentro da faixa, "neutral" se não se aplica.
+- Bioimpedância (InBody e similares): extraia peso, massa muscular esquelética, massa de gordura, percentual de gordura, IMC, água corporal, proteína, minerais, massa livre de gordura, gordura visceral, relação cintura-quadril, taxa metabólica basal, pontuação, e o histórico com datas quando houver.
+- Use exatamente estes keys quando o marcador for o mesmo (key|nome):
+${keys}
+- Para marcador novo, crie key em snake_case sem acentos.
+- category, de preferência uma destas: ${CATEGORIES.join(", ")}.
+- Ignore notas explicativas, métodos, assinaturas e cabeçalhos.
+- Se esta parte não tiver resultado nenhum, devolva {"patient":null,"exams":[]}.`;
+}
+function parseJsonLoose(text) {
+  const a = text.indexOf("{"), b = text.lastIndexOf("}");
+  if (a < 0 || b < a) throw new Error("resposta sem JSON");
+  return JSON.parse(text.slice(a, b + 1));
+}
+function cleanResult(r) {
+  if (!r) return null;
+  let key = slug(r.key || r.name); if (!key) return null;
+  if (!catalogByKey[key] && catalogByName[norm(r.name)]) key = catalogByName[norm(r.name)];
+  const cat = catalogByKey[key] || {};
+  const better = ["lower", "higher", "range", "neutral"].includes(r.better) ? r.better : (cat.better || "range");
+  const value = num(r.value);
+  return { key, name: String(r.name || cat.name || key).slice(0, 80), category: String(r.category || cat.category || "Outros").slice(0, 40),
+    value, text: r.text != null && r.text !== "" ? String(r.text).slice(0, 60) : null, unit: String(r.unit ?? cat.unit ?? "").slice(0, 24),
+    refLow: num(r.refLow), refHigh: num(r.refHigh), refText: String(r.refText || "").slice(0, 80), better };
+}
+function mergeParsed(target, parsed) {
+  for (const ex of parsed.exams || []) {
+    if (!isDate(ex.date)) continue;
+    const type = ["Laboratorial", "Bioimpedância", "Imagem", "Outro"].includes(ex.type) ? ex.type : "Outro";
+    const id = examId(ex.date, type);
+    let t = target.get(id); if (!t) { t = { id, date: ex.date, type, source: String(ex.source || "").slice(0, 80), results: new Map() }; target.set(id, t); }
+    if (!t.source && ex.source) t.source = String(ex.source).slice(0, 80);
+    for (const r0 of ex.results || []) { const r = cleanResult(r0); if (r && (r.value != null || r.text)) t.results.set(r.key, r); }
+  }
+}
+const examId = (date, type) => `exam_${date}_${type === "Bioimpedância" ? "bio" : type === "Laboratorial" ? "lab" : slug(type)}`;
+
+let PENDING = null; // { fileNames, exams:[...] } awaiting review
+async function handleFiles(files) {
+  files = [...files]; if (!files.length) return;
+  if (!AI.key()) { openSettings("Para ler exames, cole sua chave da API do Claude. Sem ela você ainda pode importar um backup."); return; }
+  const st = $("#parseStatus");
+  location.hash = "exames";
+  const barI = el("i"); const msg = el("div", { class: "small", text: "Preparando…" });
+  st.replaceChildren(el("div", { class: "card progress" }, msg, el("div", { class: "bar" }, barI)));
+  const setP = (t, f) => { msg.textContent = t; barI.style.width = Math.round(f * 100) + "%"; };
+  const found = new Map(); const problems = [];
+  try {
+    for (let fi = 0; fi < files.length; fi++) {
+      const f = files[fi];
+      const isPdf = /pdf$/i.test(f.type) || /\.pdf$/i.test(f.name);
+      const jobs = [];
+      if (isPdf) {
+        setP(`Lendo ${f.name}…`, fi / files.length);
+        let pages = [];
+        try { pages = (await pdfToPages(f)).pages; } catch (e) { pages = []; }
+        const totalText = pages.reduce((a, p) => a + p.text.length, 0);
+        if (pages.length && totalText > 50 * pages.length) {
+          let chunk = "", group = [];
+          for (const p of pages) { const block = `\n=== PÁGINA ${p.n} ===\n${p.text}`; if (chunk.length + block.length > 14000 && chunk) { group.push(chunk); chunk = ""; } chunk += block; }
+          if (chunk) group.push(chunk);
+          group.forEach((c, i) => jobs.push({ text: c, part: i + 1, total: group.length }));
+        } else if (f.size < 30 * 1024 * 1024) {
+          jobs.push({ pdf: f, part: 1, total: 1 }); // escaneado: o Claude lê o PDF inteiro
+        } else { problems.push(`${f.name}: PDF escaneado grande demais (máx. 30 MB).`); continue; }
+      } else {
+        jobs.push({ images: [await imageFileToBlob(f)], part: 1, total: 1 });
+      }
+      for (let ji = 0; ji < jobs.length; ji++) {
+        const j = jobs[ji];
+        setP(`Claude está lendo ${f.name} (parte ${j.part} de ${j.total})…`, (fi + (ji + 0.5) / jobs.length) / files.length);
+        const prompt = buildPrompt(j.part, j.total, !j.text) + (j.text ? "\n\nTEXTO DO LAUDO:\n" + j.text : "");
+        const res = await AI.ask(prompt, { images: j.images || [], pdf: j.pdf || null });
+        try { mergeParsed(found, parseJsonLoose(res.text || "")); }
+        catch (e) { problems.push(`${f.name}, parte ${j.part}: ${res.stop === "max_tokens" ? "resposta longa demais, foi cortada" : "resposta não veio em formato legível"}.`); }
+      }
+      for (const ex of found.values()) if (!ex.fileName) ex.fileName = f.name;
+    }
+    setP("Pronto. Confira os resultados.", 1);
+  } catch (e) {
+    st.replaceChildren(el("div", { class: "notice bad", text: "Não foi possível ler o arquivo: " + (e?.message || e) }));
+    return;
+  }
+  if (!found.size) { st.replaceChildren(el("div", { class: "notice warn", text: "Nenhum resultado encontrado. " + problems.join(" ") })); return; }
+  st.replaceChildren(problems.length ? el("div", { class: "notice warn", text: problems.join(" ") }) : "");
+  PENDING = { exams: [...found.values()].sort((a, b) => b.date.localeCompare(a.date)).map(e => ({ ...e, results: [...e.results.values()], include: true })) };
+  openReview();
+}
+
+function openReview() {
+  const P = PENDING; const existing = new Set(Store.docs.keys());
+  const blocks = P.exams.map((ex, ei) => {
+    const body = el("tbody", {}, ...ex.results.map((r, ri) => el("tr", {},
+      el("td", {}, el("input", { type: "checkbox", checked: r._skip ? null : true, "aria-label": "Incluir " + r.name, id: `rc-${ei}-${ri}`, onchange: e => { r._skip = !e.target.checked; } })),
+      el("td", {}, el("div", { text: r.name }), el("div", { class: "muted small", text: r.category })),
+      el("td", {}, r.value != null ? el("input", { class: "v", id: `rv-${ei}-${ri}`, value: fmt(r.value), "aria-label": "Valor de " + r.name, onchange: e => { const n = num(e.target.value); if (n != null) r.value = n; } }) : el("span", { text: r.text || "—" })),
+      el("td", { class: "muted", text: r.unit }),
+      el("td", { class: "muted small", text: r.refText || refLabel(r) }))));
+    return el("div", { class: "rev-exam" },
+      el("div", { class: "rev-head" },
+        el("input", { type: "checkbox", checked: true, id: `re-${ei}`, "aria-label": "Arquivar este exame", onchange: e => { ex.include = e.target.checked; } }),
+        el("input", { type: "date", value: ex.date, id: `rd-${ei}`, "aria-label": "Data do exame", onchange: e => { if (isDate(e.target.value)) ex.date = e.target.value; } }),
+        el("strong", { text: ex.type }),
+        el("input", { type: "text", value: ex.source || "", id: `rs-${ei}`, placeholder: "Origem", "aria-label": "Origem do exame", onchange: e => { ex.source = e.target.value; } }),
+        el("span", { class: "muted small", text: `${ex.results.length} resultados` }),
+        existing.has(examId(ex.date, ex.type)) ? el("span", { class: "chip accent", text: "já existe: será mesclado" }) : null),
+      el("div", { class: "rev-body" }, el("table", { class: "rev-tbl" }, el("thead", {}, el("tr", {}, el("th", {}, ""), el("th", { text: "Marcador" }), el("th", { text: "Valor" }), el("th", { text: "Unidade" }), el("th", { text: "Referência" }))), body)));
+  });
+  openModal(el("div", { class: "modal" },
+    el("div", {}, el("h2", { id: "mTitle", text: "Confira antes de arquivar" }),
+      el("p", { class: "muted small", style: "margin:4px 0 0", text: `O Claude encontrou ${P.exams.length} data(s) de exame. Corrija um valor clicando nele, desmarque o que não quiser guardar. Datas que já existem no arquivo são mescladas.` })),
+    ...blocks,
+    el("div", { class: "acts" },
+      el("button", { class: "btn", type: "button", onclick: () => { PENDING = null; closeModal(); } }, "Descartar"),
+      el("button", { class: "btn primary", type: "button", id: "btnSave", onclick: savePending }, "Arquivar exames"))));
+}
+
+// Merge one incoming exam into the archive. The newest exam in an upload overwrites values; older history only fills gaps.
+async function mergeExam(ex, overwrite) {
+  const id = examId(ex.date, ex.type);
+  const cur = Store.docs.get(id);
+  const results = new Map((cur?.results || []).map(r => [r.key, r]));
+  for (const r of ex.results) { if (r._skip) continue; const { _skip, ...clean } = r; if (overwrite || !results.has(r.key)) results.set(r.key, clean); }
+  const doc = { id, date: ex.date, type: ex.type, source: (overwrite ? ex.source : cur?.source) || ex.source || cur?.source || "",
+    fileName: (overwrite ? ex.fileName : cur?.fileName) || ex.fileName || cur?.fileName || null, updatedAt: new Date().toISOString(), results: [...results.values()] };
+  await Store.put(id, doc);
+}
+async function savePending() {
+  const btn = $("#btnSave"); btn.disabled = true; btn.textContent = "Arquivando…";
+  try {
+    const list = PENDING.exams.filter(e => e.include);
+    const newest = list.reduce((m, e) => e.date > m ? e.date : m, "");
+    for (const ex of list) await mergeExam(ex, ex.date === newest);
+    PENDING = null; closeModal(); $("#parseStatus").replaceChildren(el("div", { class: "notice", text: `${list.length} exame(s) arquivado(s).` }));
+    afterDataChange(); location.hash = "painel";
+  } catch (e) {
+    btn.disabled = false; btn.textContent = "Arquivar exames";
+    Banner.show(e?.code === "quota_exceeded" ? "O espaço de armazenamento acabou. Exclua exames antigos ou duplicados." : "Não foi possível salvar: " + (e?.message || e?.code), "bad");
+  }
+}
+
+/* ------------------------------------------------------------------ backup */
+function exportBackup() {
+  const data = JSON.stringify({ app: "Health Royale", version: 1, exportedAt: new Date().toISOString(), exams: Store.exams() }, null, 1);
+  const url = URL.createObjectURL(new Blob([data], { type: "application/json" }));
+  const a = el("a", { href: url, download: `health-royale-backup-${new Date().toISOString().slice(0, 10)}.json` });
+  document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+async function importBackup(file) {
+  try {
+    const o = JSON.parse(await file.text());
+    const exams = (o.exams || []).filter(e => isDate(e.date) && Array.isArray(e.results));
+    if (!exams.length) throw new Error("o arquivo não tem exames no formato do Health Royale");
+    Banner.show(`Importando ${exams.length} exames…`);
+    for (const ex of exams) {
+      const type = ex.type || "Outro";
+      await mergeExam({ date: ex.date, type, source: ex.source || "", fileName: ex.fileName || null, results: ex.results.map(cleanResult).filter(Boolean) }, true);
+    }
+    Banner.show(`${exams.length} exames importados.`); setTimeout(() => Banner.clear(), 4000);
+    afterDataChange(); location.hash = "painel";
+  } catch (e) { Banner.show("Importação falhou: " + (e.message || e.code), "bad"); }
+}
+
+/* ------------------------------------------------------------------ arena (por código de cartão, sem servidor) */
+const Arena = { vs: null };
+function myScores() {
+  const scores = {}; let sum = 0, n = 0;
+  for (const s of SERIES) { const sc = scoreOf(s); if (sc == null) continue; const r = round10(sc); scores[s.key] = { s: r, n: s.name, c: s.category }; sum += r; n++; }
+  return { scores, overall: n ? Math.round(sum / n) : 0, count: n };
+}
+const b64u = str => btoa(unescape(encodeURIComponent(str))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const unb64u = s => decodeURIComponent(escape(atob(s.replace(/-/g, "+").replace(/_/g, "/"))));
+function myCardCode() {
+  const m = myScores();
+  const card = { v: 1, nick: (Store.settings.nick || "").slice(0, 30), d: new Date().toISOString().slice(0, 10), o: m.overall, sc: Object.fromEntries(Object.entries(m.scores).map(([k, o]) => [k, o.s])) };
+  return "HR1." + b64u(JSON.stringify(card));
+}
+function readCardCode(code) {
+  const c = String(code || "").trim().replace(/\s+/g, "");
+  if (!c.startsWith("HR1.")) throw new Error("Esse não parece um código do Health Royale (deve começar com HR1.).");
+  let o; try { o = JSON.parse(unb64u(c.slice(4))); } catch (e) { throw new Error("O código está incompleto. Peça para a pessoa copiar de novo."); }
+  if (!o || typeof o.sc !== "object") throw new Error("O código não tem notas.");
+  const sc = {}; for (const [k, v] of Object.entries(o.sc)) if (/^[a-z0-9_]{1,60}$/.test(k) && typeof v === "number") sc[k] = Math.max(0, Math.min(100, Math.round(v)));
+  const vals = Object.values(sc);
+  return { nick: String(o.nick || "").slice(0, 30) || "Amigo", date: isDate(o.d) ? o.d : null, overall: vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0, count: vals.length, sc };
+}
+const markerName = k => catalogByKey[k]?.name || SERIES.find(s => s.key === k)?.name || k.replace(/_/g, " ").replace(/^./, c => c.toUpperCase());
+function renderArena() {
+  const body = $("#arenaBody"); body.replaceChildren();
+  const mine = myScores(); const friends = Store.settings.friends || [];
+  const nickIn = el("input", { type: "text", id: "nick", maxlength: "30", value: Store.settings.nick || "", placeholder: "Seu apelido na arena", style: "border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--surface);min-width:200px",
+    onchange: async e => { await Store.saveSettings({ nick: e.target.value.trim() }); renderArena(); } });
+  const code = mine.count ? myCardCode() : "";
+  const codeBox = el("textarea", { readonly: true, id: "myCode", rows: "3", "aria-label": "Seu código de cartão", style: "width:100%;font-family:var(--f-num);font-size:12px;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--bg);color:var(--ink);resize:vertical" }); codeBox.value = code;
+  body.append(el("div", { class: "card" },
+    el("h2", { text: "Seu cartão" }),
+    el("p", { class: "small", style: "margin:-4px 0 10px", text: mine.count ? `Seu cartão leva as notas dos seus ${mine.count} marcadores com referência (nota geral ${mine.overall}). Valores, datas e arquivos não entram no código.` : "Arquive pelo menos um exame para gerar seu cartão." }),
+    el("div", { class: "toolbar", style: "margin-bottom:10px" }, el("label", { for: "nick", class: "small muted", text: "Apelido" }), nickIn),
+    code ? codeBox : null,
+    code ? el("div", { class: "toolbar", style: "margin-top:8px" },
+      el("button", { class: "btn primary", type: "button", onclick: async e => { try { await navigator.clipboard.writeText(code); e.target.textContent = "Copiado"; setTimeout(() => e.target.textContent = "Copiar meu código", 2000); } catch (_) { codeBox.select(); } } }, "Copiar meu código"),
+      el("span", { class: "small muted", text: "Mande para seus amigos pelo WhatsApp. Gere um novo depois de cada exame." })) : null));
+  const pasteIn = el("textarea", { id: "friendCode", rows: "2", placeholder: "Cole aqui o código HR1.… de um amigo", "aria-label": "Código do amigo", style: "width:100%;font-family:var(--f-num);font-size:12px;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--surface);color:var(--ink);resize:vertical" });
+  const errBox = el("div");
+  body.append(el("div", { class: "card" }, el("h2", { text: "Adicionar amigo" }), pasteIn,
+    el("div", { class: "toolbar", style: "margin-top:8px" }, el("button", { class: "btn", type: "button", onclick: async () => {
+      try {
+        const c = readCardCode(pasteIn.value);
+        const list = (Store.settings.friends || []).filter(f => f.nick !== c.nick);
+        list.push({ ...c, id: "f" + Date.now().toString(36) });
+        await Store.saveSettings({ friends: list }); Arena.vs = list[list.length - 1].id; renderArena();
+      } catch (e) { errBox.replaceChildren(el("div", { class: "notice bad", style: "margin-top:8px", text: e.message })); }
+    } }, "Adicionar à arena"), el("span", { class: "small muted", text: "Um código com o mesmo apelido substitui o anterior." })), errBox));
+  const me = { id: "me", nick: "Você", overall: mine.overall, count: mine.count, sc: Object.fromEntries(Object.entries(mine.scores).map(([k, o]) => [k, o.s])) };
+  const rows = [...(mine.count ? [me] : []), ...friends].sort((a, b) => b.overall - a.overall);
+  if (friends.length) body.append(el("div", { class: "card" }, el("h2", { text: "Classificação" }),
+    el("p", { class: "muted small", style: "margin:-6px 0 8px", text: "Nota geral = média das notas dos marcadores de cada pessoa." }),
+    el("div", { class: "rank" }, ...rows.map((r, i) => el("div", { class: "rk" + (r.id === "me" ? " me" : "") },
+      el("div", { class: "pos", text: String(i + 1) }),
+      el("div", {}, el("div", { class: "nm", text: r.nick }), el("div", { class: "muted small", text: `${r.count} marcadores` + (r.date ? ` · cartão de ${fmtDate(r.date)}` : "") })),
+      el("div", { class: "meter", "aria-hidden": "true" }, el("i", { style: `width:${Math.max(0, Math.min(100, r.overall))}%` })),
+      el("div", { style: "display:flex;gap:10px;align-items:center" }, el("span", { class: "num", style: "font-weight:600;min-width:3ch;text-align:right", text: String(r.overall) }),
+        r.id !== "me" ? el("button", { class: "btn sm", type: "button", "aria-label": "Remover " + r.nick, onclick: async () => { await Store.saveSettings({ friends: (Store.settings.friends || []).filter(f => f.id !== r.id) }); renderArena(); } }, "Remover") : null))))));
+  if (!friends.length || !mine.count) { body.append(el("div", { class: "notice", text: friends.length ? "Arquive um exame para ver o confronto direto." : "Quando você adicionar o código de um amigo, a classificação e o confronto direto aparecem aqui." })); return; }
+  if (!Arena.vs || !friends.some(f => f.id === Arena.vs)) Arena.vs = friends[0].id;
+  const opp = friends.find(f => f.id === Arena.vs);
+  const sel = el("select", { id: "vsSel", "aria-label": "Escolher adversário", onchange: e => { Arena.vs = e.target.value; renderArena(); } }, ...friends.map(o => el("option", { value: o.id, text: o.nick, selected: o.id === Arena.vs || null })));
+  const mineW = [], theirW = [], tie = [];
+  for (const [k, a] of Object.entries(me.sc)) { const b = opp.sc[k]; if (typeof b !== "number") continue; const name = markerName(k); if (a > b) mineW.push(name); else if (b > a) theirW.push(name); else tie.push(name); }
+  const pills = (arr, k) => arr.length ? el("div", { class: "pill-list" }, ...arr.sort((x, y) => x.localeCompare(y, "pt-BR")).map(n => el("span", { class: "chip " + k, text: n }))) : el("p", { class: "empty", text: "Nenhum." });
+  body.append(el("div", { class: "card" },
+    el("div", { class: "head" }, el("h2", { text: "Confronto direto" }), el("div", { class: "toolbar" }, el("span", { class: "muted small", text: "Você contra" }), sel)),
+    el("div", { class: "tally" },
+      el("div", {}, el("div", { class: "big num", style: "color:var(--good)", text: String(mineW.length) }), el("div", { class: "who", text: "Você melhor" })),
+      el("div", {}, el("div", { class: "big num muted", text: String(tie.length) }), el("div", { class: "who", text: "Empates" })),
+      el("div", {}, el("div", { class: "big num", style: "color:var(--bad)", text: String(theirW.length) }), el("div", { class: "who", text: opp.nick + " melhor" }))),
+    el("p", { class: "muted small", style: "text-align:center;margin:0 0 12px", text: `${mineW.length + theirW.length + tie.length} marcadores que vocês dois têm em comum. Ninguém vê o valor do outro.` }),
+    el("div", { class: "vs" },
+      el("div", {}, el("h3", { style: "margin-bottom:8px", text: "Você está melhor em" }), pills(mineW, "good")),
+      el("div", {}, el("h3", { style: "margin-bottom:8px", text: `${opp.nick} está melhor em` }), pills(theirW, "bad")),
+      el("div", {}, el("h3", { style: "margin-bottom:8px", text: "Empate" }), pills(tie, "neutral")))));
+}
+
+/* ------------------------------------------------------------------ routing & boot */
+const VIEWS = ["painel", "tabela", "exames", "arena"];
+function route() {
+  const v = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : "painel";
+  for (const n of VIEWS) $("#v-" + n).classList.toggle("on", n === v);
+  document.querySelectorAll("nav.tabs a").forEach(a => { if (a.dataset.v === v) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
+}
+function renderAll() { SERIES = buildSeries(Store.exams()); renderPainel(); renderTabela(); renderExames(); renderArena(); }
+function afterDataChange() {}
+
+window.addEventListener("hashchange", route);
+$("#btnAdd").addEventListener("click", () => AI.key() ? $("#fileIn").click() : openSettings("Para ler exames, cole sua chave da API do Claude. Sem ela você ainda pode importar um backup."));
+$("#btnPick").addEventListener("click", () => AI.key() ? $("#fileIn").click() : openSettings("Para ler exames, cole sua chave da API do Claude. Sem ela você ainda pode importar um backup."));
+$("#fileIn").addEventListener("change", e => { handleFiles(e.target.files); e.target.value = ""; });
+$("#btnImport").addEventListener("click", () => $("#jsonIn").click());
+$("#jsonIn").addEventListener("change", e => { if (e.target.files[0]) importBackup(e.target.files[0]); e.target.value = ""; });
+$("#btnExport").addEventListener("click", exportBackup);
+["q", "catSel", "onlyOut"].forEach(id => $("#" + id).addEventListener("input", renderTabela));
+const drop = $("#drop");
+["dragenter", "dragover"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => handleFiles(e.dataTransfer.files));
+
+route(); renderAll();
+Store.onChange(renderAll);
+Store.init().then(renderAll);
+$("#btnSettings").addEventListener("click", () => openSettings());
+</script>
+</body>
+</html>

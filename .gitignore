@@ -1,0 +1,8 @@
+# Nunca versionar exames pessoais
+health-royale-backup*.json
+*.pdf
+*.jfif
+*.jpg
+*.jpeg
+*.png
+.DS_Store
